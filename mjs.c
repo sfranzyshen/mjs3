@@ -16,14 +16,27 @@
 #define isnan(x) _isnan(x)
 #endif
 
+struct prop {
+  mjs_val_t name;
+  mjs_val_t value;
+  int next;  // index of the next property, or -1 if this is the last one
+};
+
+struct obj {
+  short flags;
+  short props;  // index of the first property of this object, or -1
+};
+
 struct mjs {
   char error_message[50];
   mjs_val_t data_stack[50];
   mjs_val_t call_stack[20];
-  int sp;                // points to the top of the data stack
-  int csp;               // points to the top of the call stack
-  char stringbuf[1024];  // contains strings
-  int sblen;             // stringbuf length
+  int sp;                  // points to the top of the data stack
+  int csp;                 // points to the top of the call stack
+  char stringbuf[1024];    // contains strings
+  int sblen;               // stringbuf length
+  struct obj objs[50];     // all available objects
+  struct prop props[100];  // all available props
 };
 
 // clang-format off
@@ -493,6 +506,7 @@ static mjs_err_t parse_statement_list(struct pstate *p, int et) {
 
 struct mjs *mjs_create(void) {
   struct mjs *mjs = (struct mjs *) calloc(1, sizeof(*mjs));
+  printf("mjs context created: %d bytes\n", sizeof(*mjs));
   return mjs;
 };
 
