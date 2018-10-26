@@ -13,3 +13,6 @@ matrix:
     - os: linux
       compiler: clang
       script: make test98
+      sudo: required
+      services:
+        - docker
