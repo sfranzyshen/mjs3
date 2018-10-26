@@ -4,5 +4,8 @@ os:
   - linux
   - osx
   - windows
+compiler:
+  - clang
+  - gcc
 script:
   - make test
