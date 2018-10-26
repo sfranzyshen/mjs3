@@ -506,7 +506,7 @@ static mjs_err_t parse_statement_list(struct pstate *p, int et) {
 
 struct mjs *mjs_create(void) {
   struct mjs *mjs = (struct mjs *) calloc(1, sizeof(*mjs));
-  printf("mjs context created: %d bytes\n", sizeof(*mjs));
+  printf("MJS CONTEXT: %lu bytes\n", sizeof(*mjs));
   return mjs;
 };
 
