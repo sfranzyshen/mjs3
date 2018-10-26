@@ -4,34 +4,133 @@
 #include "mjs.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #if !defined(_MSC_VER) || _MSC_VER >= 1700
-#include <stdint.h>
 #else
-typedef unsigned int uint32_t;
+#define vsnprintf _vsnprintf
 #endif
+
+struct mjs {
+  char error_message[50];
+  mjs_val_t data_stack[50];
+  mjs_val_t call_stack[20];
+  int sp;                // points to the top of the data stack
+  int csp;               // points to the top of the call stack
+  char stringbuf[1024];  // contains strings
+  int sblen;             // stringbuf length
+};
+
+// clang-format off
+enum mjs_type {
+  MJS_TYPE_UNDEFINED, MJS_TYPE_NULL, MJS_TYPE_TRUE, MJS_TYPE_FALSE,
+  MJS_TYPE_NUMBER, MJS_TYPE_STRING, MJS_TYPE_OBJECT_GENERIC,
+  MJS_TYPE_OBJECT_ARRAY, MJS_TYPE_OBJECT_FUNCTION,
+};
+// clang-format on
+
+// 32bit floating-point number: 1 bit sign, 8 bits exponent, 23 bits mantissa
+//      3        2        1       0
+//  seeeeeee|emmmmmmm|mmmmmmmm|mmmmmmmm
+//  11111111|1ttttvvv|vvvvvvvv|vvvvvvvv
+//     NaN    |type| 19-bit placeholder for payload
+
+#define MK_MJS_VAL(t, p) (((unsigned int) ~0 << 23) | ((t) << 19) | (p))
+#define MJS_VTYPE(v) (((v) >> 19) & 0xf)
+#define MJS_VPLAYLOAD(v) ((v) & ((unsigned int) ~0 >> (32 - 19)))
 
 //////////////////////////////////// HELPERS /////////////////////////////////
 static mjs_err_t mjs_set_err(struct mjs *mjs, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  vsnprintf(mjs->err_msg, sizeof(mjs->err_msg), fmt, ap);
+  vsnprintf(mjs->error_message, sizeof(mjs->error_message), fmt, ap);
   va_end(ap);
-  return MJS_ERR;
+  return MJS_ERROR;
+}
+
+static void mjs_tracev(const char *label, mjs_val_t v) {
+  printf("%10s: v %x, t %d, p %d\n", label, v, MJS_VTYPE(v), MJS_VPLAYLOAD(v));
+}
+
+static mjs_val_t mjs_mkval(enum mjs_type t, unsigned int payload) {
+  mjs_val_t v = MK_MJS_VAL(t, payload);
+  mjs_tracev("MKVAL", v);
+  return v;
+}
+
+static mjs_val_t mjs_tov(float f) {
+  union {
+    mjs_val_t v;
+    float f;
+  } u;
+  u.f = f;
+  return u.v;
+}
+
+static float mjs_tof(mjs_val_t v) {
+  union {
+    mjs_val_t v;
+    float f;
+  } u;
+  u.v = v;
+  return u.f;
 }
 
 ////////////////////////////////////// VM ////////////////////////////////////
+int mjs_is_string(mjs_val_t v) {
+  return MJS_VTYPE(v) == MJS_TYPE_STRING;
+}
+
+int mjs_is_number(mjs_val_t v) {
+  return !isnan(mjs_tof(v));
+}
+
 static void mjs_push(struct mjs *mjs, mjs_val_t v) {
-  if (mjs->sp < (int) (sizeof(mjs->stack) / sizeof(mjs->stack[0]))) {
-    mjs->stack[mjs->sp] = v;
+  if (mjs->sp < (int) (sizeof(mjs->data_stack) / sizeof(mjs->data_stack[0]))) {
+    mjs->data_stack[mjs->sp] = v;
     mjs->sp++;
   } else {
     mjs_set_err(mjs, "stack overflow");
   }
+}
+
+static mjs_val_t mjs_mkstr(struct mjs *mjs, int len) {
+  if (len > (int) sizeof(mjs->stringbuf) + 3 - mjs->sblen) {
+    mjs_set_err(mjs, "stringbuf too small");
+    return mjs_mkval(MJS_TYPE_UNDEFINED, 0);
+  } else {
+    mjs_val_t v = mjs_mkval(MJS_TYPE_STRING, mjs->sblen);
+    mjs->stringbuf[mjs->sblen++] = (len >> 8) & 0xf;  // save
+    mjs->stringbuf[mjs->sblen++] = len & 0xf;         // length
+    mjs->sblen += len;                                // data will be here
+    mjs->stringbuf[mjs->sblen++] = '\0';              // nul-terminate
+    return v;
+  }
+}
+
+float mjs_get_number(mjs_val_t v) {
+  return mjs_tof(v);
+}
+
+char *mjs_get_string(struct mjs *mjs, mjs_val_t v, int *len) {
+  char *p = mjs->stringbuf + MJS_VPLAYLOAD(v);
+  // mjs_tracev("GETSTR", v);
+  if (len != NULL) *len = (unsigned char) p[0] << 8 | (unsigned char) p[1];
+  return p + 2;
+}
+
+mjs_val_t mjs_concat_strings(struct mjs *mjs, mjs_val_t v1, mjs_val_t v2) {
+  int n1, n2;
+  char *p1 = mjs_get_string(mjs, v1, &n1), *p2 = mjs_get_string(mjs, v2, &n2);
+  mjs_val_t v = mjs_mkstr(mjs, n1 + n2);
+  char *p = mjs_get_string(mjs, v, NULL);
+  memmove(p, p1, n1);
+  memmove(p + n1, p2, n2);
+  return v;
 }
 
 ////////////////////////////////// TOKENIZER /////////////////////////////////
@@ -52,9 +151,9 @@ struct pstate {
   struct mjs *mjs;
 };
 
-#define DT(a, b) ((a) << 8 | (b))
-#define TT(a, b, c) ((a) << 16 | (b) << 8 | (c))
-#define QT(a, b, c, d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
+#define DOUBLE_TOK(a, b) ((a) << 8 | (b))
+#define TRIPLE_TOK(a, b, c) ((a) << 16 | (b) << 8 | (c))
+#define QUAD_TOK(a, b, c, d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
 
 // clang-format off
 enum {
@@ -127,9 +226,9 @@ static int longtok4(struct pstate *p, char a, char b, char c, char d) {
 static int getnum(struct pstate *p) {
   if (p->pos[0] == '0' && p->pos[1] == 'x') {
     // MSVC6 strtod cannot parse 0x... numbers, thus this ugly workaround.
-    p->tok.num_value = strtoul(p->pos + 2, (char **) &p->pos, 16);
+    p->tok.num_value = (float) strtoul(p->pos + 2, (char **) &p->pos, 16);
   } else {
-    p->tok.num_value = strtof(p->pos, (char **) &p->pos);
+    p->tok.num_value = (float) strtod(p->pos, (char **) &p->pos);
   }
   p->tok.len = p->pos - p->tok.ptr;
   p->pos--;
@@ -247,17 +346,17 @@ static int pnext(struct pstate *p) {
 
 ////////////////////////////////// PARSER /////////////////////////////////
 
-#define PARSE_LTR_BINOP(p, f1, f2, ops)        \
-  do {                                         \
-    mjs_err_t res = MJS_OK;                    \
-    if ((res = f1(p)) != MJS_OK) return res;   \
-    if (findtok(ops, p->tok.tok) != TOK_EOF) { \
-      int op = p->tok.tok;                     \
-      pnext(p);                                \
-      if ((res = f2(p)) != MJS_OK) return res; \
-      do_op(p, op);                            \
-    }                                          \
-    return res;                                \
+#define PARSE_LTR_BINOP(p, f1, f2, ops)                    \
+  do {                                                     \
+    mjs_err_t res = MJS_SUCCESS;                           \
+    if ((res = f1(p)) != MJS_SUCCESS) return res;          \
+    if (findtok(ops, p->tok.tok) != TOK_EOF) {             \
+      int op = p->tok.tok;                                 \
+      pnext(p);                                            \
+      if ((res = f2(p)) != MJS_SUCCESS) return res;        \
+      if ((res = do_op(p, op)) != MJS_SUCCESS) return res; \
+    }                                                      \
+    return res;                                            \
   } while (0)
 
 static int findtok(int *toks, int tok) {
@@ -266,43 +365,66 @@ static int findtok(int *toks, int tok) {
   return toks[i];
 }
 
-static void do_op(struct pstate *p, int op) {
-  // assert(op >= 0 && op <= 255);
+static mjs_val_t do_arith_op(float f1, float f2, int op) {
+  float res;
+  // clang-format off
+  switch (op) {
+    case '+': res = f1 + f2; break;
+    case '-': res = f1 - f2; break;
+    case '*': res = f1 * f2; break;
+    case '/': res = f1 / f2; break;
+    case '%': res = (mjs_val_t) f1 % (mjs_val_t) f2; break;
+  }
+  // clang-format on
+  return mjs_tov(res);
+}
+
+static mjs_err_t do_op(struct pstate *p, int op) {
+  mjs_val_t *top = &p->mjs->data_stack[p->mjs->sp];
   printf("DOING OP %c, p %p\n", op, p);
-  mjs_val_t *top = &p->mjs->stack[p->mjs->sp];
   switch (op) {
     case '+':
-      top[-2] = top[-2] + top[-1];
-      p->mjs->sp--;
-      break;
+      if (mjs_is_string(top[-2]) && mjs_is_string(top[-1])) {
+        top[-2] = mjs_concat_strings(p->mjs, top[-2], top[-1]);
+        p->mjs->sp--;
+        break;
+      }
+    // Fallthrough
     case '-':
-      top[-2] = top[-2] - top[-1];
-      p->mjs->sp--;
-      break;
     case '*':
-      top[-2] = top[-2] * top[-1];
-      p->mjs->sp--;
-      break;
     case '/':
-      top[-2] = top[-2] / top[-1];
-      p->mjs->sp--;
-      break;
     case '%':
-      top[-2] = (unsigned long) top[-2] % (unsigned long) top[-1];
-      p->mjs->sp--;
+      if (mjs_is_number(top[-2]) && mjs_is_number(top[-1])) {
+        top[-2] = do_arith_op(mjs_tof(top[-2]), mjs_tof(top[-1]), op);
+        p->mjs->sp--;
+      } else {
+        return mjs_set_err(p->mjs, "apples to apples please");
+      }
       break;
     default:
-      mjs_set_err(p->mjs, "Unknown op: %c", op);
+      return mjs_set_err(p->mjs, "Unknown op: %c", op);
       break;
   }
+  return MJS_SUCCESS;
 }
 
 static mjs_err_t parse_literal(struct pstate *p) {
-  if (p->tok.tok != TOK_NUM) return mjs_set_err(p->mjs, "Expectedd number");
-  printf("PARSING NUM [%.*s]\n", p->tok.len, p->tok.ptr);
-  mjs_push(p->mjs, p->tok.num_value);
+  mjs_val_t v = 0;
+  if (p->tok.tok == TOK_NUM) {
+    printf("PARSING NUM [%.*s]\n", p->tok.len, p->tok.ptr);
+    v = mjs_tov(p->tok.num_value);
+  } else if (p->tok.tok == TOK_STR) {
+    printf("PARSING STR [%.*s]\n", p->tok.len, p->tok.ptr);
+    v = mjs_mkstr(p->mjs, p->tok.len);
+    memmove(&p->mjs->stringbuf[p->mjs->sblen - p->tok.len - 1], p->tok.ptr,
+            p->tok.len);
+  } else {
+    return mjs_set_err(p->mjs, "Unexpected literal: [%.*s]", p->tok.len,
+                       p->tok.ptr);
+  }
+  mjs_push(p->mjs, v);
   pnext(p);
-  return MJS_OK;
+  return MJS_SUCCESS;
 }
 
 static mjs_err_t parse_mul_div_rem(struct pstate *p) {
@@ -327,15 +449,15 @@ static mjs_err_t parse_expr(struct pstate *p) {
 static mjs_err_t parse_statement(struct pstate *p) {
   switch (p->tok.tok) {
     // clang-format off
-    case ';': pnext(p); return MJS_OK;
+    case ';': pnext(p); return MJS_SUCCESS;
 #if 0
     case TOK_LET: return parse_let(p);
     case TOK_OPEN_CURLY: return parse_block(p, 1);
     case TOK_RETURN: return parse_return(p);
     case TOK_FOR: return parse_for(p);
     case TOK_WHILE: return parse_while(p);
-    case TOK_BREAK: pnext1(p); return MJS_OK;
-    case TOK_CONTINUE: pnext1(p); return MJS_OK;
+    case TOK_BREAK: pnext1(p); return MJS_SUCCESS;
+    case TOK_CONTINUE: pnext1(p); return MJS_SUCCESS;
     case TOK_IF: return parse_if(p);
 #endif
     case TOK_CASE: case TOK_CATCH: case TOK_DELETE: case TOK_DO:
@@ -345,9 +467,9 @@ static mjs_err_t parse_statement(struct pstate *p) {
       return mjs_set_err(p->mjs, "[%.*s] is not implemented", p->tok.len,
                          p->tok.ptr);
     default: {
-      mjs_err_t res = MJS_OK;
+      mjs_err_t res = MJS_SUCCESS;
       for (;;) {
-        if ((res = parse_expr(p)) != MJS_OK) return res;
+        if ((res = parse_expr(p)) != MJS_SUCCESS) return res;
         if (p->tok.tok != ',') break;
         pnext(p);
       }
@@ -357,35 +479,58 @@ static mjs_err_t parse_statement(struct pstate *p) {
 }
 
 static mjs_err_t parse_statement_list(struct pstate *p, int et) {
-  mjs_err_t res = MJS_OK;
+  mjs_err_t res = MJS_SUCCESS;
   pnext(p);
-  while (res == MJS_OK && p->tok.tok != TOK_EOF && p->tok.tok != et) {
+  while (res == MJS_SUCCESS && p->tok.tok != TOK_EOF && p->tok.tok != et) {
     res = parse_statement(p);
     while (p->tok.tok == ';') pnext(p);
   }
   return res;
 }
 
-////////////////////////////////// MAIN /////////////////////////////////
+/////////////////////////////// EXTERNAL API /////////////////////////////////
 
-mjs_err_t mjs_exec(struct mjs *mjs, const char *buf) {
+struct mjs *mjs_create(void) {
+  struct mjs *mjs = (struct mjs *) calloc(1, sizeof(*mjs));
+  return mjs;
+};
+
+void mjs_destroy(struct mjs *mjs) {
+  free(mjs);
+}
+
+mjs_err_t mjs_exec(struct mjs *mjs, const char *buf, mjs_val_t *v) {
   struct pstate p;
-  mjs->err_msg[0] = '\0';
+  mjs_err_t e;
+  mjs->error_message[0] = '\0';
   pinit(buf, &p);
   p.mjs = mjs;
-  return parse_statement_list(&p, TOK_EOF);
+  e = parse_statement_list(&p, TOK_EOF);
+  if (e == MJS_SUCCESS && v != NULL) *v = mjs->data_stack[0];
+  mjs_tracev("EXEC", mjs->data_stack[0]);
+  return e;
 }
 
 #ifdef MJS_MAIN
+
+void mjs_printv(mjs_val_t v, struct mjs *mjs) {
+  if (mjs_is_number(v)) {
+    printf("%f", mjs_tof(v));
+  } else if (mjs_is_string(v)) {
+    printf("%s", mjs_get_string(mjs, v, NULL));
+  } else {
+    mjs_tracev("Unknown value", v);
+  }
+}
+
 int main(int argc, char *argv[]) {
   int i;
-  struct mjs mjs;
-  mjs_err_t err = MJS_OK;
-  memset(&mjs, 0, sizeof(mjs));
-  for (i = 1; i < argc && argv[i][0] == '-' && err == MJS_OK; i++) {
+  struct mjs *mjs = mjs_create();
+  mjs_err_t err = MJS_SUCCESS;
+  for (i = 1; i < argc && argv[i][0] == '-' && err == MJS_SUCCESS; i++) {
     if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
       const char *code = argv[++i];
-      err = mjs_exec(&mjs, code);
+      err = mjs_exec(mjs, code, NULL);
     } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
       printf("Usage: %s [-e js_expression]\n", argv[0]);
       return EXIT_SUCCESS;
@@ -394,11 +539,13 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
   }
-  if (err != MJS_OK || mjs.sp <= 0 || mjs.sp > 1) {
-    printf("Error: [%s], sp=%d\n", mjs.err_msg, mjs.sp);
+  if (err != MJS_SUCCESS || mjs->sp <= 0 || mjs->sp > 1) {
+    printf("Error: [%s], sp=%d\n", mjs->error_message, mjs->sp);
   } else {
-    printf("%f\n", (float) mjs.stack[0]);
+    mjs_printv(mjs->data_stack[0], mjs);
+    putchar('\n');
   }
+  mjs_destroy(mjs);
   return EXIT_SUCCESS;
 }
-#endif  // MJS_MAIN*
+#endif  // MJS_MAIN

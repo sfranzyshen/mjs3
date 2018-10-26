@@ -8,16 +8,18 @@
 extern "C" {
 #endif
 
-typedef float mjs_val_t;
-typedef enum { MJS_OK, MJS_ERR } mjs_err_t;
+struct mjs;
+typedef unsigned int mjs_val_t;
+typedef enum { MJS_SUCCESS, MJS_ERROR } mjs_err_t;
 
-struct mjs {
-  char err_msg[20];
-  mjs_val_t stack[50];
-  int sp;
-};
+struct mjs *mjs_create(void);
+void mjs_destroy(struct mjs *);
+mjs_err_t mjs_exec(struct mjs *mjs, const char *buf, mjs_val_t *result);
 
-mjs_err_t mjs_exec(struct mjs *mjs, const char *buf);
+int mjs_is_number(mjs_val_t v);
+int mjs_is_string(mjs_val_t v);
+float mjs_get_number(mjs_val_t v);
+char *mjs_get_string(struct mjs *, mjs_val_t v, int *len);
 
 #if defined(__cplusplus)
 }
