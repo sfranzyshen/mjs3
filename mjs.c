@@ -13,6 +13,7 @@
 #if !defined(_MSC_VER) || _MSC_VER >= 1700
 #else
 #define vsnprintf _vsnprintf
+#define isnan(x) _isnan(x)
 #endif
 
 struct mjs {
@@ -104,10 +105,10 @@ static mjs_val_t mjs_mkstr(struct mjs *mjs, int len) {
     return mjs_mkval(MJS_TYPE_UNDEFINED, 0);
   } else {
     mjs_val_t v = mjs_mkval(MJS_TYPE_STRING, mjs->sblen);
-    mjs->stringbuf[mjs->sblen++] = (len >> 8) & 0xf;  // save
-    mjs->stringbuf[mjs->sblen++] = len & 0xf;         // length
-    mjs->sblen += len;                                // data will be here
-    mjs->stringbuf[mjs->sblen++] = '\0';              // nul-terminate
+    mjs->stringbuf[mjs->sblen++] = (len >> 8) & 0xff;  // save
+    mjs->stringbuf[mjs->sblen++] = len & 0xff;         // length
+    mjs->sblen += len;                                 // data will be here
+    mjs->stringbuf[mjs->sblen++] = '\0';               // nul-terminate
     return v;
   }
 }
@@ -366,14 +367,14 @@ static int findtok(int *toks, int tok) {
 }
 
 static mjs_val_t do_arith_op(float f1, float f2, int op) {
-  float res;
+  float res = 0;
   // clang-format off
   switch (op) {
     case '+': res = f1 + f2; break;
     case '-': res = f1 - f2; break;
     case '*': res = f1 * f2; break;
     case '/': res = f1 / f2; break;
-    case '%': res = (mjs_val_t) f1 % (mjs_val_t) f2; break;
+    case '%': res = (float) ((mjs_val_t) f1 % (mjs_val_t) f2); break;
   }
   // clang-format on
   return mjs_tov(res);
