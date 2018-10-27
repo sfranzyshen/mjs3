@@ -1,7 +1,9 @@
+#include "mjs.h"
+
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
-#include "mjs.h"
 
 static int check_num(mjs_val_t v, float expected) {
   return mjs_is_number(v) && fabs(mjs_get_number(v) - expected) < 0.0001;
@@ -39,5 +41,6 @@ static void test_strings(void) {
 int main(void) {
   test_expr();
   test_strings();
+  printf("TEST PASSED\n");
   return 0;
 }
