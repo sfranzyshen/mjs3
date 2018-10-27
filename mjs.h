@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-struct mjs;
+#define mjs vm
 typedef unsigned int mjs_val_t;
 typedef enum { MJS_SUCCESS, MJS_ERROR } mjs_err_t;
 
