@@ -468,34 +468,7 @@ static int pnext(struct parser *p) {
 
 ////////////////////////////////// PARSER /////////////////////////////////
 
-#define PARSE_LTR_BINOP(p, f1, f2, ops, prev_op)                     \
-  do {                                                               \
-    err_t res = MJS_SUCCESS;                                         \
-    if ((res = f1(p, TOK_EOF)) != MJS_SUCCESS) return res;           \
-    if (prev_op != TOK_EOF && (res = do_op(p, prev_op))) return res; \
-    if (findtok(ops, p->tok.tok) != TOK_EOF) {                       \
-      int op = p->tok.tok;                                           \
-      pnext(p);                                                      \
-      if ((res = f2(p, op)) != MJS_SUCCESS) return res;              \
-    }                                                                \
-    return res;                                                      \
-  } while (0)
-
-#define PARSE_RTL_BINOP(p, f1, f2, ops, prev_op)             \
-  do {                                                       \
-    err_t res = MJS_SUCCESS;                                 \
-    (void) prev_op;                                          \
-    if ((res = f1(p, TOK_EOF)) != MJS_SUCCESS) return res;   \
-    if (findtok(ops, p->tok.tok) != TOK_EOF) {               \
-      int op = p->tok.tok;                                   \
-      pnext(p);                                              \
-      if ((res = f2(p, TOK_EOF)) != MJS_SUCCESS) return res; \
-      if ((res = do_op(p, op)) != MJS_SUCCESS) return res;   \
-    }                                                        \
-    return res;                                              \
-  } while (0)
-
-static int findtok(int *toks, int tok) {
+static int findtok(const int *toks, int tok) {
   int i = 0;
   while (tok != toks[i] && toks[i] != TOK_EOF) i++;
   return toks[i];
@@ -544,6 +517,35 @@ static err_t do_op(struct parser *p, int op) {
   return MJS_SUCCESS;
 }
 
+typedef err_t bpf_t(struct parser *p, int prev_op);
+
+static err_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
+                             const int *ops, int prev_op) {
+  err_t res = MJS_SUCCESS;
+  if ((res = f1(p, TOK_EOF)) != MJS_SUCCESS) return res;
+  if (prev_op != TOK_EOF && (res = do_op(p, prev_op))) return res;
+  if (findtok(ops, p->tok.tok) != TOK_EOF) {
+    int op = p->tok.tok;
+    pnext(p);
+    if ((res = f2(p, op)) != MJS_SUCCESS) return res;
+  }
+  return res;
+}
+
+static err_t parse_rtl_binop(struct parser *p, bpf_t f1, bpf_t f2,
+                             const int *ops, int prev_op) {
+  err_t res = MJS_SUCCESS;
+  (void) prev_op;
+  if ((res = f1(p, TOK_EOF)) != MJS_SUCCESS) return res;
+  if (findtok(ops, p->tok.tok) != TOK_EOF) {
+    int op = p->tok.tok;
+    pnext(p);
+    if ((res = f2(p, TOK_EOF)) != MJS_SUCCESS) return res;
+    if ((res = do_op(p, op)) != MJS_SUCCESS) return res;
+  }
+  return res;
+}
+
 static err_t parse_literal(struct parser *p, int prev_op) {
   err_t res = MJS_SUCCESS;
   val_t v = 0;
@@ -570,12 +572,12 @@ static err_t parse_literal(struct parser *p, int prev_op) {
 
 static err_t parse_mul_div_rem(struct parser *p, int prev_op) {
   int ops[] = {'*', '/', '%', TOK_EOF};
-  PARSE_LTR_BINOP(p, parse_literal, parse_mul_div_rem, ops, prev_op);
+  return parse_ltr_binop(p, parse_literal, parse_mul_div_rem, ops, prev_op);
 }
 
 static err_t parse_plus_minus(struct parser *p, int prev_op) {
   int ops[] = {'+', '-', TOK_EOF};
-  PARSE_LTR_BINOP(p, parse_mul_div_rem, parse_plus_minus, ops, prev_op);
+  return parse_ltr_binop(p, parse_mul_div_rem, parse_plus_minus, ops, prev_op);
 }
 
 static err_t parse_ternary(struct parser *p, int prev_op) {
@@ -601,7 +603,8 @@ static int s_assign_ops[] = {
 };
 // clang-format on
 static err_t parse_assignment(struct parser *p, int prev_op) {
-  PARSE_RTL_BINOP(p, parse_ternary, parse_assignment, s_assign_ops, prev_op);
+  return parse_rtl_binop(p, parse_ternary, parse_assignment, s_assign_ops,
+                         prev_op);
 }
 
 static err_t parse_expr(struct parser *p) {
