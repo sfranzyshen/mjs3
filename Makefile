@@ -1,5 +1,5 @@
 PROG = mjs
-MFLAGS = -DMJS_DEBUG
+MFLAGS = -DMJS_DEBUG -g -O0
 all: $(PROG)
 .PHONY: test
 

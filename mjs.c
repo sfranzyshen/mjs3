@@ -43,20 +43,28 @@ struct vm {
 
 // clang-format off
 enum mjs_type {
-  TYPE_UNDEFINED, TYPE_NULL, TYPE_TRUE, TYPE_FALSE, TYPE_STRING,
-  TYPE_OBJECT_GENERIC, TYPE_OBJECT_ARRAY, TYPE_OBJECT_FUNCTION,
+  TYPE_UNDEFINED, TYPE_NULL, TYPE_TRUE, TYPE_FALSE, TYPE_STRING, TYPE_OBJECT,
+  TYPE_ARRAY, TYPE_FUNCTION, TYPE_NUMBER
 };
 // clang-format on
 
 // 32bit floating-point number: 1 bit sign, 8 bits exponent, 23 bits mantissa
-//      3        2        1       0
+//
+//  7f80 0000 = 01111111 10000000 00000000 00000000 = infinity
+//  ff80 0000 = 11111111 10000000 00000000 00000000 = −infinity
+//  ffc0 0001 = x1111111 11000000 00000000 00000001 = qNaN (on x86 and ARM)
+//  ff80 0001 = x1111111 10000000 00000000 00000001 = sNaN (on x86 and ARM)
+//
 //  seeeeeee|emmmmmmm|mmmmmmmm|mmmmmmmm
 //  11111111|1ttttvvv|vvvvvvvv|vvvvvvvv
-//    -inf    |type| 19-bit placeholder for payload
+//    INF     TYPE     PAYLOAD
 
-#define MK_MJS_VAL(t, p) (0x7f800000 | ((val_t)(t) << 19) | (p))
+#define IS_FLOAT(v) (((v) &0xff800000) != 0xff800000)
+#define MK_VAL(t, p) (0xff800000 | ((val_t)(t) << 19) | (p))
 #define VAL_TYPE(v) (((v) >> 19) & 0x0f)
-#define VAL_PAYLOAD(v) ((v) & ((val_t) ~0 >> (32 - 19)))
+#define VAL_PAYLOAD(v) ((v) & ~0xfff80000)
+
+#define ARRSIZE(x) ((int) (sizeof(x) / sizeof((x)[0])))
 
 #define DBGPREFIX "[DEBUG] "
 #ifdef MJS_DEBUG
@@ -103,22 +111,22 @@ static float mjs_tof(val_t v) {
 }
 
 static const char *vstr(val_t v) {
-  static char buf[20];
-  const char *names[] = {"undefined", "null",       "true",
-                         "false",     "(string)",   "(object)",
-                         "(array)",   "(function)", "(UNKNOWN)"};
-  int i = VAL_TYPE(v), max = sizeof(names) / sizeof(names[0]);
-  if (i < 0 || i >= max) i = max - 1;
+  static char buf[30];
+  const char *names[] = {"(undefined)", "(null)",   "(true)",  "(false)",
+                         "(string)",    "(object)", "(array)", "(function)",
+                         "(number)",    "?",        "?",       "?",
+                         "?",           "?",        "?",       "?"};
+
   if (mjs_is_number(v)) {
     snprintf(buf, sizeof(buf), "(number) %f", mjs_tof(v));
   } else {
-    snprintf(buf, sizeof(buf), "%s", names[i]);
+    snprintf(buf, sizeof(buf), "%s", names[VAL_TYPE(v)]);
   }
   return buf;
 }
 
 static val_t mkval(enum mjs_type t, unsigned int payload) {
-  val_t v = MK_MJS_VAL(t, payload);
+  val_t v = MK_VAL(t, payload);
   LOG((DBGPREFIX "%s: %s\n", __func__, vstr(v)));
   return v;
 }
@@ -129,15 +137,15 @@ int mjs_is_string(val_t v) {
 }
 
 int mjs_is_number(val_t v) {
-  return !((v & ((val_t) ~0 >> 9)) == 0x7f800000);
+  return IS_FLOAT(v);
 }
 
 int mjs_is_object(val_t v) {
-  return VAL_TYPE(v) == TYPE_OBJECT_GENERIC;
+  return VAL_TYPE(v) == TYPE_OBJECT;
 }
 
 static void mjs_push(struct vm *vm, val_t v) {
-  if (vm->sp < (int) (sizeof(vm->data_stack) / sizeof(vm->data_stack[0]))) {
+  if (vm->sp >= 0 && vm->sp < ARRSIZE(vm->data_stack)) {
     vm->data_stack[vm->sp] = v;
     vm->sp++;
   } else {
@@ -190,11 +198,11 @@ static val_t mjs_concat(struct vm *vm, val_t v1, val_t v2) {
 static val_t mjs_mk_obj(struct vm *vm) {
   int i;
   // Start iterating from 1, because object 0 is always a global object
-  for (i = 1; i < (int) (sizeof(vm->objs) / sizeof(vm->objs[0])); i++) {
+  for (i = 1; i < ARRSIZE(vm->objs); i++) {
     if (vm->objs[i].flags & OBJ_ALLOCATED) continue;
     vm->objs[i].flags = OBJ_ALLOCATED;
     vm->objs[i].props = -1;
-    return mkval(TYPE_OBJECT_GENERIC, i);
+    return mkval(TYPE_OBJECT, i);
   }
   mjs_err(vm, "obj OOM");
   return mkval(TYPE_UNDEFINED, 0);
@@ -202,9 +210,12 @@ static val_t mjs_mk_obj(struct vm *vm) {
 
 static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_is_object(obj)) {
-    int i;
-    struct obj *o = &vm->objs[VAL_PAYLOAD(obj)];
-    for (i = 1; i < (int) (sizeof(vm->props) / sizeof(vm->props[0])); i++) {
+    int i, obj_index = VAL_PAYLOAD(obj);
+    struct obj *o = &vm->objs[obj_index];
+    if (obj_index < 0 || obj_index >= ARRSIZE(vm->objs)) {
+      return mjs_err(vm, "corrupt obj, index %x", obj_index);
+    }
+    for (i = 0; i < ARRSIZE(vm->props); i++) {
       struct prop *p = &vm->props[i];
       if (p->flags & PROP_ALLOCATED) continue;
       p->flags = PROP_ALLOCATED;
@@ -221,6 +232,25 @@ static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   } else {
     return mjs_err(vm, "setting prop on non-object");
   }
+}
+
+static err_t lookup(struct vm *vm, const char *ptr, int len, val_t *v) {
+  int i, n, obj_index = VAL_PAYLOAD(vm->call_stack[0]);
+  struct obj *o = &vm->objs[obj_index];
+  if (obj_index < 0 || obj_index >= ARRSIZE(vm->objs)) {
+    return mjs_err(vm, "corrupt obj, index %x", obj_index);
+  }
+  i = o->props;
+  while (i >= 0) {
+    struct prop *p = &vm->props[i];
+    char *key = mjs_get_string(vm, p->key, &n);
+    if (n == len && memcmp(key, ptr, n) == 0) {
+      if (v) *v = p->val;
+      return MJS_SUCCESS;
+    }
+    i = p->next;
+  }
+  return mjs_err(mjs, "[%.*s] undefined", len, ptr);
 }
 
 ////////////////////////////////// TOKENIZER /////////////////////////////////
@@ -513,6 +543,7 @@ static err_t do_op(struct parser *p, int op) {
 }
 
 static err_t parse_literal(struct parser *p, int prev_op) {
+  err_t res = MJS_SUCCESS;
   val_t v = 0;
   (void) prev_op;
   switch (p->tok.tok) {
@@ -522,6 +553,9 @@ static err_t parse_literal(struct parser *p, int prev_op) {
     case TOK_STR:
       v = mk_str(p->vm, p->tok.ptr, p->tok.len);
       break;
+    case TOK_IDENT:
+      res = lookup(p->mjs, p->tok.ptr, p->tok.len, &v);
+      break;
     default:
       return mjs_err(p->vm, "Unexpected literal: [%.*s]", p->tok.len,
                      p->tok.ptr);
@@ -529,7 +563,7 @@ static err_t parse_literal(struct parser *p, int prev_op) {
   }
   mjs_push(p->vm, v);
   pnext(p);
-  return MJS_SUCCESS;
+  return res;
 }
 
 static err_t parse_mul_div_rem(struct parser *p, int prev_op) {
@@ -575,10 +609,12 @@ static err_t parse_expr(struct parser *p) {
 static err_t parse_let(struct parser *p) {
   err_t res = MJS_SUCCESS;
   pnext(p);
+  LOG((DBGPREFIX "%s: %d %d\n", __func__, p->tok.tok, p->tok.tok == TOK_IDENT));
   for (;;) {
     struct tok tmp = p->tok;
     val_t obj, key, val = mkval(TYPE_UNDEFINED, 0);
     if (p->tok.tok != TOK_IDENT) return mjs_err(p->vm, "indent expected");
+    pnext(p);
     if (p->tok.tok == '=') {
       pnext(p);
       if ((res = parse_expr(p)) != MJS_SUCCESS) return res;
@@ -592,7 +628,6 @@ static err_t parse_let(struct parser *p) {
       pnext(p);
     }
     if (p->tok.tok == ';' || p->tok.tok == TOK_EOF) break;
-    pnext(p);
   }
   return res;
 }
@@ -646,7 +681,7 @@ struct vm *mjs_create(void) {
   struct vm *vm = (struct mjs *) calloc(1, sizeof(*vm));
   vm->objs[0].flags = OBJ_ALLOCATED;
   vm->objs[0].props = -1;
-  vm->call_stack[0] = mkval(TYPE_OBJECT_GENERIC, 0);
+  vm->call_stack[0] = mkval(TYPE_OBJECT, 0);
   printf("MJS CONTEXT: %lu bytes\n", sizeof(*vm));
   return vm;
 };
