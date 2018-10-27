@@ -19,4 +19,4 @@ test98: unit_test.c mjs.c mjs.h
 	$(VC98) wine $@.exe
 
 clean:
-	rm -rf $(PROG) *.exe *.obj
+	rm -rf $(PROG) test *.exe *.obj
