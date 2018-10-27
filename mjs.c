@@ -110,6 +110,7 @@ static float mjs_tof(val_t v) {
   return u.f;
 }
 
+#ifdef MJS_DEBUG
 static const char *vstr(val_t v) {
   static char buf[30];
   const char *names[] = {"(undefined)", "(null)",   "(true)",  "(false)",
@@ -124,6 +125,7 @@ static const char *vstr(val_t v) {
   }
   return buf;
 }
+#endif
 
 static val_t mkval(enum mjs_type t, unsigned int payload) {
   val_t v = MK_VAL(t, payload);
@@ -132,12 +134,12 @@ static val_t mkval(enum mjs_type t, unsigned int payload) {
 }
 
 ////////////////////////////////////// VM ////////////////////////////////////
-int mjs_is_string(val_t v) {
-  return VAL_TYPE(v) == TYPE_STRING;
-}
-
 int mjs_is_number(val_t v) {
   return IS_FLOAT(v);
+}
+
+int mjs_is_string(val_t v) {
+  return VAL_TYPE(v) == TYPE_STRING;
 }
 
 int mjs_is_object(val_t v) {
@@ -195,18 +197,18 @@ static val_t mjs_concat(struct vm *vm, val_t v1, val_t v2) {
   return v;
 }
 
-static val_t mjs_mk_obj(struct vm *vm) {
-  int i;
-  // Start iterating from 1, because object 0 is always a global object
-  for (i = 1; i < ARRSIZE(vm->objs); i++) {
-    if (vm->objs[i].flags & OBJ_ALLOCATED) continue;
-    vm->objs[i].flags = OBJ_ALLOCATED;
-    vm->objs[i].props = -1;
-    return mkval(TYPE_OBJECT, i);
-  }
-  mjs_err(vm, "obj OOM");
-  return mkval(TYPE_UNDEFINED, 0);
-}
+// static val_t mjs_mk_obj(struct vm *vm) {
+//   int i;
+//   // Start iterating from 1, because object 0 is always a global object
+//   for (i = 1; i < ARRSIZE(vm->objs); i++) {
+//     if (vm->objs[i].flags & OBJ_ALLOCATED) continue;
+//     vm->objs[i].flags = OBJ_ALLOCATED;
+//     vm->objs[i].props = -1;
+//     return mkval(TYPE_OBJECT, i);
+//   }
+//   mjs_err(vm, "obj OOM");
+//   return mkval(TYPE_UNDEFINED, 0);
+// }
 
 static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_is_object(obj)) {
@@ -682,7 +684,7 @@ struct vm *mjs_create(void) {
   vm->objs[0].flags = OBJ_ALLOCATED;
   vm->objs[0].props = -1;
   vm->call_stack[0] = mkval(TYPE_OBJECT, 0);
-  printf("MJS CONTEXT: %lu bytes\n", sizeof(*vm));
+  LOG((DBGPREFIX "%s: size %d bytes\n", __func__, (int) sizeof(*vm)));
   return vm;
 };
 
@@ -706,7 +708,7 @@ err_t mjs_exec(struct vm *vm, const char *buf, val_t *v) {
 
 void mjs_printv(val_t v, struct vm *vm) {
   if (mjs_is_number(v)) {
-    printf("%f", mjs_tof(v));
+    printf("%g", mjs_tof(v));
   } else if (mjs_is_string(v)) {
     printf("%s", mjs_get_string(mjs, v, NULL));
   } else {

@@ -1,10 +1,11 @@
 PROG = mjs
-MFLAGS = -DMJS_DEBUG -g -O0
+MFLAGS = -g -O0
 all: $(PROG)
 .PHONY: test
 
 $(PROG): mjs.c mjs.h
 	$(CC) -o $@ mjs.c -W -Wall -DMJS_MAIN $(MFLAGS)
+	./$@ -e 'let a = 1.23; a + 1;'
 
 VC98 = docker run -v $(CURDIR):$(CURDIR) -w $(CURDIR) docker.io/mgos/vc98
 vc98: mjs.c mjs.h 

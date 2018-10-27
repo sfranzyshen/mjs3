@@ -14,10 +14,13 @@ typedef enum { MJS_SUCCESS, MJS_ERROR } mjs_err_t;
 
 struct mjs *mjs_create(void);
 void mjs_destroy(struct mjs *);
+
 mjs_err_t mjs_exec(struct mjs *mjs, const char *buf, mjs_val_t *result);
 
 int mjs_is_number(mjs_val_t v);
 int mjs_is_string(mjs_val_t v);
+int mjs_is_object(mjs_val_t v);
+
 float mjs_get_number(mjs_val_t v);
 char *mjs_get_string(struct mjs *, mjs_val_t v, int *len);
 
