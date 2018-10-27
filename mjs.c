@@ -43,9 +43,8 @@ struct vm {
 
 // clang-format off
 enum mjs_type {
-  TYPE_UNDEFINED, TYPE_NULL, TYPE_TRUE, TYPE_FALSE,
-  TYPE_NUMBER, TYPE_STRING, TYPE_OBJECT_GENERIC,
-  TYPE_OBJECT_ARRAY, TYPE_OBJECT_FUNCTION,
+  TYPE_UNDEFINED, TYPE_NULL, TYPE_TRUE, TYPE_FALSE, TYPE_STRING,
+  TYPE_OBJECT_GENERIC, TYPE_OBJECT_ARRAY, TYPE_OBJECT_FUNCTION,
 };
 // clang-format on
 
@@ -53,11 +52,11 @@ enum mjs_type {
 //      3        2        1       0
 //  seeeeeee|emmmmmmm|mmmmmmmm|mmmmmmmm
 //  11111111|1ttttvvv|vvvvvvvv|vvvvvvvv
-//     NaN    |type| 19-bit placeholder for payload
+//    -inf    |type| 19-bit placeholder for payload
 
-#define MK_MJS_VAL(t, p) (((unsigned int) ~0 << 23) | ((t) << 19) | (p))
-#define MJS_VTYPE(v) (((v) >> 19) & 0xf)
-#define MJS_VPLAYLOAD(v) ((v) & ((unsigned int) ~0 >> (32 - 19)))
+#define MK_MJS_VAL(t, p) (0x7f800000 | ((val_t)(t) << 19) | (p))
+#define VAL_TYPE(v) (((v) >> 19) & 0x0f)
+#define VAL_PAYLOAD(v) ((v) & ((val_t) ~0 >> (32 - 19)))
 
 #define DBGPREFIX "[DEBUG] "
 #ifdef MJS_DEBUG
@@ -70,7 +69,6 @@ enum mjs_type {
 #else
 #define vsnprintf _vsnprintf
 #define snprintf _snprintf
-#define isnan(x) _isnan(x)
 #define _STRINGIFY(x) #x
 #define STRINGIFY(x) _STRINGIFY(x)
 #define __func__ __FILE__ ":" STRINGIFY(__LINE__)
@@ -84,19 +82,6 @@ static err_t mjs_err(struct vm *vm, const char *fmt, ...) {
   va_end(ap);
   LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
   return MJS_ERROR;
-}
-
-static const char *vstr(val_t v) {
-  static char buf[20];
-  snprintf(buf, sizeof(buf), "%x, t %d, p %d\n", v, MJS_VTYPE(v),
-           MJS_VPLAYLOAD(v));
-  return buf;
-}
-
-static val_t mkval(enum mjs_type t, unsigned int payload) {
-  val_t v = MK_MJS_VAL(t, payload);
-  LOG((DBGPREFIX "%s: %s\n", __func__, vstr(v)));
-  return v;
 }
 
 static val_t mjs_tov(float f) {
@@ -117,17 +102,38 @@ static float mjs_tof(val_t v) {
   return u.f;
 }
 
+static const char *vstr(val_t v) {
+  static char buf[20];
+  const char *names[] = {"undefined", "null",       "true",
+                         "false",     "(string)",   "(object)",
+                         "(array)",   "(function)", "(UNKNOWN)"};
+  int i = VAL_TYPE(v), max = sizeof(names) / sizeof(names[0]);
+  if (i < 0 || i >= max) i = max - 1;
+  if (mjs_is_number(v)) {
+    snprintf(buf, sizeof(buf), "(number) %f", mjs_tof(v));
+  } else {
+    snprintf(buf, sizeof(buf), "%s", names[i]);
+  }
+  return buf;
+}
+
+static val_t mkval(enum mjs_type t, unsigned int payload) {
+  val_t v = MK_MJS_VAL(t, payload);
+  LOG((DBGPREFIX "%s: %s\n", __func__, vstr(v)));
+  return v;
+}
+
 ////////////////////////////////////// VM ////////////////////////////////////
 int mjs_is_string(val_t v) {
-  return MJS_VTYPE(v) == TYPE_STRING;
+  return VAL_TYPE(v) == TYPE_STRING;
 }
 
 int mjs_is_number(val_t v) {
-  return !isnan(mjs_tof(v));
+  return !((v & ((val_t) ~0 >> 9)) == 0x7f800000);
 }
 
 int mjs_is_object(val_t v) {
-  return MJS_VTYPE(v) == TYPE_OBJECT_GENERIC;
+  return VAL_TYPE(v) == TYPE_OBJECT_GENERIC;
 }
 
 static void mjs_push(struct vm *vm, val_t v) {
@@ -166,7 +172,7 @@ float mjs_get_number(val_t v) {
 }
 
 char *mjs_get_string(struct vm *vm, val_t v, int *len) {
-  char *p = vm->stringbuf + MJS_VPLAYLOAD(v);
+  char *p = vm->stringbuf + VAL_PAYLOAD(v);
   if (len != NULL) *len = (unsigned char) p[0] << 8 | (unsigned char) p[1];
   return p + 2;
 }
@@ -197,7 +203,7 @@ static val_t mjs_mk_obj(struct vm *vm) {
 static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_is_object(obj)) {
     int i;
-    struct obj *o = &vm->objs[MJS_VPLAYLOAD(obj)];
+    struct obj *o = &vm->objs[VAL_PAYLOAD(obj)];
     for (i = 1; i < (int) (sizeof(vm->props) / sizeof(vm->props[0])); i++) {
       struct prop *p = &vm->props[i];
       if (p->flags & PROP_ALLOCATED) continue;
@@ -586,6 +592,7 @@ static err_t parse_let(struct parser *p) {
       pnext(p);
     }
     if (p->tok.tok == ';' || p->tok.tok == TOK_EOF) break;
+    pnext(p);
   }
   return res;
 }
