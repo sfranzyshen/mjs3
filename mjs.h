@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 // Types
-#define mjs vm
+#define mjs vm                   // Aliasing `struct mjs` to `struct vm`
 typedef unsigned int mjs_val_t;  // must be uint32_t
 typedef enum { MJS_SUCCESS, MJS_FAILURE } mjs_err_t;
 typedef enum {
