@@ -1,5 +1,5 @@
 PROG = mjs
-CFLAGS += -W -Wall -Werror -Wshadow -flto -Wstrict-overflow -fno-strict-aliasing
+CFLAGS += -W -Wall -Werror -Wshadow -Wstrict-overflow -fno-strict-aliasing
 MFLAGS = -g -DMJS_DEBUG -Os
 all: $(PROG)
 .PHONY: test $(PROG)
