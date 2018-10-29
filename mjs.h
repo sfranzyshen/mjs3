@@ -40,4 +40,30 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, int *len);
 }
 #endif
 
+// VM tunables
+
+#ifndef MJS_DATA_STACK_SIZE
+#define MJS_DATA_STACK_SIZE 25
+#endif
+
+#ifndef MJS_CALL_STACK_SIZE
+#define MJS_CALL_STACK_SIZE 25
+#endif
+
+#ifndef MJS_STRING_POOL_SIZE
+#define MJS_STRING_POOL_SIZE 128
+#endif
+
+#ifndef MJS_OBJ_POOL_SIZE
+#define MJS_OBJ_POOL_SIZE 10
+#endif
+
+#ifndef MJS_PROP_POOL_SIZE
+#define MJS_PROP_POOL_SIZE 20
+#endif
+
+#ifndef MJS_ERROR_MESSAGE_SIZE
+#define MJS_ERROR_MESSAGE_SIZE 50
+#endif
+
 #endif  // MJS_H

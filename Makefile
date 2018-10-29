@@ -6,7 +6,7 @@ all: $(PROG)
 
 $(PROG): mjs.c mjs.h
 	$(CC) -o $@ mjs.c $(CFLAGS) -DMJS_MAIN $(MFLAGS)
-	./$@ -e 'let a = 1.23; a + 1; let f = function(a) { return a + 1; };'
+	./$@ -e 'let a = 1.23; let f = function(a) { return a + 1; };'
 
 VC98 = docker run -v $(CURDIR):$(CURDIR) -w $(CURDIR) docker.io/mgos/vc98
 vc98: mjs.c mjs.h 

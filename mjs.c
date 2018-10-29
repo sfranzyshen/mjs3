@@ -31,15 +31,15 @@ struct obj {
 #define NO_PROP ((unsigned short) ~0)
 
 struct vm {
-  char error_message[50];
-  val_t data_stack[10];
-  val_t call_stack[10];
-  int sp;                 // Points to the top of the data stack
-  int csp;                // Points to the top of the call stack
-  char stringbuf[512];    // String pool
-  int sblen;              // String pool current length
-  struct obj objs[20];    // Objects pool
-  struct prop props[40];  // Props pool
+  char error_message[MJS_ERROR_MESSAGE_SIZE];
+  val_t data_stack[MJS_DATA_STACK_SIZE];
+  val_t call_stack[MJS_CALL_STACK_SIZE];
+  int sp;                                 // Points to the top of the data stack
+  int csp;                                // Points to the top of the call stack
+  char stringbuf[MJS_STRING_POOL_SIZE];   // String pool
+  int sblen;                              // String pool current length
+  struct obj objs[MJS_OBJ_POOL_SIZE];     // Objects pool
+  struct prop props[MJS_PROP_POOL_SIZE];  // Props pool
 };
 
 // clang-format off
@@ -141,7 +141,9 @@ static val_t mkval(enum mjs_type t, unsigned int payload) {
 }
 
 ////////////////////////////////////// VM ////////////////////////////////////
-mjs_type_t mjs_type(val_t v) { return IS_FLOAT(v) ? MJS_NUMBER : VAL_TYPE(v); }
+mjs_type_t mjs_type(val_t v) {
+  return IS_FLOAT(v) ? MJS_NUMBER : VAL_TYPE(v);
+}
 
 static void vm_push(struct vm *vm, val_t v) {
   if (vm->sp >= 0 && vm->sp < ARRSIZE(vm->data_stack)) {
@@ -175,7 +177,9 @@ static val_t mk_str(struct vm *vm, const char *p, int len) {
   }
 }
 
-float mjs_get_number(val_t v) { return mjs_tof(v); }
+float mjs_get_number(val_t v) {
+  return mjs_tof(v);
+}
 
 char *mjs_get_string(struct vm *vm, val_t v, int *len) {
   char *p = vm->stringbuf + VAL_PAYLOAD(v);
@@ -319,7 +323,9 @@ static int mjs_is_space(int c) {
          c == '\v';
 }
 
-static int mjs_is_digit(int c) { return c >= '0' && c <= '9'; }
+static int mjs_is_digit(int c) {
+  return c >= '0' && c <= '9';
+}
 
 static int mjs_is_alpha(int c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -835,7 +841,9 @@ struct vm *mjs_create(void) {
   return vm;
 };
 
-void mjs_destroy(struct vm *vm) { free(vm); }
+void mjs_destroy(struct vm *vm) {
+  free(vm);
+}
 
 err_t mjs_exec(struct vm *vm, const char *buf, val_t *v) {
   struct parser p;
