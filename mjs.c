@@ -658,10 +658,9 @@ static err_t parse_literal(struct parser *p, int prev_op) {
 }
 
 static err_t parse_call_dot_mem(struct parser *p, int prev_op) {
-  int ops[] = {'.', '(', '[', TOK_EOF};
   err_t res = MJS_SUCCESS;
   if ((res = parse_literal(p, p->tok.tok)) != MJS_SUCCESS) return res;
-  while (findtok(ops, p->tok.tok) != TOK_EOF) {
+  while (p->tok.tok == '.' || p->tok.tok == '(' || p->tok.tok == '[') {
     if (p->tok.tok == '[') {
       int prev_tok = p->prev_tok;
       pnext(p);
