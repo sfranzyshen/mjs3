@@ -17,17 +17,23 @@ static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
          n == (int) strlen(expected);
 }
 
+static int check_code_num(struct mjs *mjs, const char *code, float expected) {
+  mjs_val_t v;
+  if (mjs_exec(mjs, code, &v) != MJS_SUCCESS) return 0;
+  return check_num(v, expected);
+}
+
 static void test_expr(void) {
   struct mjs *mjs = mjs_create();
-  mjs_val_t v;
-  assert(mjs_exec(mjs, "1 + 2 * 3.7 - 7 % 3", &v) == MJS_SUCCESS);
-  assert(check_num(v, 7.4f));
-  assert(mjs_exec(mjs, "let a = 1.23, b = 5.3;", &v) == MJS_SUCCESS);
-  assert(check_num(v, 5.3f));
-  assert(mjs_exec(mjs, "a;", &v) == MJS_SUCCESS);
-  assert(check_num(v, 1.23f));
-  assert(mjs_exec(mjs, "a - 2 * 3.1;", &v) == MJS_SUCCESS);
-  assert(check_num(v, -4.97f));
+  assert(check_code_num(mjs, "1 + 2 * 3.7 - 7 % 3", 7.4f));
+  assert(check_code_num(mjs, "let a = 1.23, b = 5.3;", 5.3f));
+  assert(check_code_num(mjs, "a;", 1.23f));
+  assert(check_code_num(mjs, "a - 2 * 3.1;", -4.97f));
+  assert(check_code_num(mjs,
+                        "let a = 1.23; a + 1; "
+                        "let f = function(a) { return a + 1; };1;",
+                        1));
+  assert(check_code_num(mjs, "2 * (1 + 2)", 6.0f));
   mjs_destroy(mjs);
 }
 
