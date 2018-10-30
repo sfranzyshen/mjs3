@@ -11,15 +11,15 @@ static int check_num(mjs_val_t v, float expected) {
 }
 
 static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
-  int n;
+  mjs_len_t n;
   return mjs_type(v) == MJS_STRING &&
          strcmp(mjs_get_string(mjs, v, &n), expected) == 0 &&
-         n == (int) strlen(expected);
+         n == strlen(expected);
 }
 
 static int check_code_num(struct mjs *mjs, const char *code, float expected) {
   mjs_val_t v;
-  if (mjs_exec(mjs, code, &v) != MJS_SUCCESS) return 0;
+  if (mjs_exec(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
   return check_num(v, expected);
 }
 
@@ -40,7 +40,7 @@ static void test_expr(void) {
 static void test_strings(void) {
   struct mjs *mjs = mjs_create();
   mjs_val_t v;
-  assert(mjs_exec(mjs, "'a' + 'b'", &v) == MJS_SUCCESS);
+  assert(mjs_exec(mjs, "'a' + 'b'", 9, &v) == MJS_SUCCESS);
   assert(check_str(mjs, v, "ab"));
   mjs_destroy(mjs);
 }
