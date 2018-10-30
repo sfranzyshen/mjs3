@@ -147,7 +147,7 @@ static val_t mkval(enum mjs_type t, ind_t payload) {
 mjs_type_t mjs_type(val_t v) { return IS_FLOAT(v) ? MJS_NUMBER : VAL_TYPE(v); }
 
 static void vm_push(struct vm *vm, val_t v) {
-  if (vm->sp >= 0 && vm->sp < ARRSIZE(vm->data_stack)) {
+  if (vm->sp < ARRSIZE(vm->data_stack)) {
     vm->data_stack[vm->sp] = v;
     vm->sp++;
   } else {
@@ -220,7 +220,7 @@ static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_OBJECT) {
     ind_t i, obj_index = (ind_t) VAL_PAYLOAD(obj);
     struct obj *o = &vm->objs[obj_index];
-    if (obj_index < 0 || obj_index >= ARRSIZE(vm->objs)) {
+    if (obj_index >= ARRSIZE(vm->objs)) {
       return vm_err(vm, "corrupt obj, index %x", obj_index);
     }
     for (i = 0; i < ARRSIZE(vm->props); i++) {
@@ -847,7 +847,7 @@ static err_t parse_let(struct parser *p) {
 
 static err_t parse_statement(struct parser *p) {
   switch (p->tok.tok) {
-      // clang-format off
+    // clang-format off
     case ';': pnext(p); return MJS_SUCCESS;
     case TOK_LET: return parse_let(p);
     case '{': return parse_block(p, 1);
