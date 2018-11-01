@@ -22,7 +22,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
   32-bit float value, no standard JS library
 - mJS VM executes JS source directly, no AST/bytecode is generated
 
-## Supported operations and constructs
+## Supported standard operations and constructs
 
 | Name              |  Operation                   |
 | ----------------- | ---------------------------- |
@@ -36,7 +36,10 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
 | Arrays            | `let arr = [1, 2, 'hi there']` |
 
-## Unsupported operations and constructs
+
+## Supported non-standard operations
+
+## Unsupported standard operations and constructs
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
