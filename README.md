@@ -23,14 +23,22 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ## Supported syntax and API
 
-| Name              |  Operation                                | Supported |
-| ----------------- | ----------------------------------------- | ------ |
-| Closures          |                                           | no |
-| Ternary           | `... ? ... : ...`                         | yes    |
-| Assignments       | `&#124;=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  | yes    |
-| Arithmetic ops    | `+`, `-`, `*`, `/`, `%`                   | yes    |
-| Equality          | `==`, `!=`                                | no |
-| Strict equality   | `!==`, `!==`                              | yes    |
+Supported operations and constructs
+
+| Name              |  Operation                                |
+| ----------------- | ----------------------------------------- |
+| Logical, bitwise  | `\|\|`, `&&`, `\|`, `^`, `&`, ``          |
+| Ternary           | `... ? ... : ...`                         |
+| Assignments       | `\|=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  |
+| Arithmetic ops    | `+`, `-`, `*`, `/`, `%`                   |
+| Strict equality   | `!==`, `!==`                              |
+
+Not supported operations and constructs
+
+| Name              |  Operation                                |
+| ----------------- | ----------------------------------------- |
+| Equality          | `==`, `!=`                                |
+| Closures          | `let f = function() { let x = 1; return function() { return x } };`  |
 
 ## Usage example
 
