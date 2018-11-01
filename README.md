@@ -30,7 +30,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | typeof            | `typeof(...)`                |
 | delete            | `delete obj.k`               |
 | for, while, for..in  | `for (let k in obj) { ... }` |
-| Variable decl     | `let a, b, c = 12.3, d = 'a'; ` |
+| Declations        | `let a, b, c = 12.3, d = 'a'; ` |
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
@@ -50,9 +50,13 @@ mJS is a single-header JavaScript engine for microcontrollers.
 ```c
 #include "mjs.h"
 
-...
-struct mjs *mjs = mjs_create();
-mjs_destroy(mjs);
+int main(void) {
+  struct mjs *mjs = mjs_create();
+  mjs_val_t result;
+  mjs_eval(mjs, "let a = 1; a++;", -1, &result);
+  mjs_destroy(mjs);
+  return 0;
+}
 ```
 
 ## JS API Reference

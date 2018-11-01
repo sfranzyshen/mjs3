@@ -8,32 +8,30 @@
 extern "C" {
 #endif
 
+#if !defined(_MSC_VER) || _MSC_VER >= 1700
+#include <stdint.h>
+#else
+typedef unsigned int uint32_t;
+typedef unsigned short uint16_t;
+typedef unsigned char uint8_t;
+#define vsnprintf _vsnprintf
+#define snprintf _snprintf
+#define _STRINGIFY(x) #x
+#define STRINGIFY(x) _STRINGIFY(x)
+#define __func__ __FILE__ ":" STRINGIFY(__LINE__)
+#pragma warning(disable : 4127)
+#endif
+
 // Types
-#define mjs vm                   // Aliasing `struct mjs` to `struct vm`
-typedef unsigned int mjs_val_t;  // must be uint32_t
-typedef unsigned int mjs_len_t;
+#define mjs vm  // Aliasing `struct mjs` to `struct vm`
+typedef uint32_t mjs_val_t;
+typedef uint32_t mjs_len_t;
 typedef enum { MJS_SUCCESS, MJS_FAILURE } mjs_err_t;
-typedef enum {
-  MJS_UNDEFINED,
-  MJS_NULL,
-  MJS_TRUE,
-  MJS_FALSE,
-  MJS_STRING,
-  MJS_OBJECT,
-  MJS_ARRAY,
-  MJS_FUNCTION,
-  MJS_NUMBER,
-} mjs_type_t;
 
-// Create/destroy
-struct mjs *mjs_create(void);
-void mjs_destroy(struct mjs *);
-
-// Execute code
-mjs_err_t mjs_exec(struct mjs *mjs, const char *buf, int len, mjs_val_t *res);
-
-// Inspect values
-mjs_type_t mjs_type(mjs_val_t val);
+// API
+struct mjs *mjs_create(void);    // Create instance
+void mjs_destroy(struct mjs *);  // Destroy instance
+mjs_err_t mjs_eval(struct mjs *mjs, const char *buf, int len, mjs_val_t *res);
 float mjs_get_number(mjs_val_t v);
 char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 
@@ -67,6 +65,8 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 #define MJS_ERROR_MESSAGE_SIZE 40
 #endif
 
+///////////////////////////////// IMPLEMENTATION //////////////////////////
+
 #include <assert.h>
 #include <float.h>
 #include <math.h>
@@ -79,10 +79,16 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 typedef mjs_val_t val_t;
 typedef mjs_err_t err_t;
 typedef mjs_len_t len_t;
-typedef struct mjs vm;
-typedef unsigned short ind_t;
+typedef uint16_t ind_t;
 typedef val_t tok_t;
 #define INVALID_INDEX ((ind_t) ~0)
+
+// clang-format off
+typedef enum {
+  MJS_UNDEFINED, MJS_NULL, MJS_TRUE, MJS_FALSE, MJS_STRING, MJS_OBJECT,
+  MJS_ARRAY, MJS_FUNCTION, MJS_NUMBER
+} mjs_type_t;
+// clang-format on
 
 struct prop {
   val_t key;
@@ -136,16 +142,6 @@ struct vm {
 #define LOG(x)
 #endif
 
-#if !defined(_MSC_VER) || _MSC_VER >= 1700
-#else
-#define vsnprintf _vsnprintf
-#define snprintf _snprintf
-#define _STRINGIFY(x) #x
-#define STRINGIFY(x) _STRINGIFY(x)
-#define __func__ __FILE__ ":" STRINGIFY(__LINE__)
-#pragma warning(disable : 4127)
-#endif
-
 #define TRY(expr)                       \
   do {                                  \
     res = expr;                         \
@@ -160,6 +156,10 @@ static err_t vm_err(struct vm *vm, const char *fmt, ...) {
   va_end(ap);
   LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
   return MJS_FAILURE;
+}
+
+static mjs_type_t mjs_type(val_t v) {
+  return IS_FLOAT(v) ? MJS_NUMBER : VAL_TYPE(v);
 }
 
 static val_t tov(float f) {
@@ -233,8 +233,6 @@ static val_t mkval(mjs_type_t t, ind_t payload) {
 }
 
 ////////////////////////////////////// VM ////////////////////////////////////
-mjs_type_t mjs_type(val_t v) { return IS_FLOAT(v) ? MJS_NUMBER : VAL_TYPE(v); }
-
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 float mjs_get_number(val_t v) { return tof(v); }
 
@@ -1174,7 +1172,7 @@ struct vm *mjs_create(void) {
 
 void mjs_destroy(struct vm *vm) { free(vm); }
 
-err_t mjs_exec(struct vm *vm, const char *buf, int len, val_t *v) {
+err_t mjs_eval(struct vm *vm, const char *buf, int len, val_t *v) {
   struct parser p = mk_parser(vm, buf, len);
   err_t e;
   vm->error_message[0] = '\0';
@@ -1195,7 +1193,7 @@ int main(int argc, char *argv[]) {
   for (i = 1; i < argc && argv[i][0] == '-' && err == MJS_SUCCESS; i++) {
     if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
       const char *code = argv[++i];
-      err = mjs_exec(mjs, code, strlen(code), NULL);
+      err = mjs_eval(mjs, code, strlen(code), NULL);
     } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
       printf("Usage: %s [-e js_expression]\n", argv[0]);
       return EXIT_SUCCESS;
@@ -1213,6 +1211,5 @@ int main(int argc, char *argv[]) {
   return EXIT_SUCCESS;
 }
 #endif  // MJS_MAIN
-
 
 #endif  // MJS_H

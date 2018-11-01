@@ -19,19 +19,19 @@ static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
 
 static int numexpr(struct mjs *mjs, const char *code, float expected) {
   mjs_val_t v;
-  if (mjs_exec(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
+  if (mjs_eval(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
   return check_num(v, expected);
 }
 
 static int strexpr(struct mjs *mjs, const char *code, const char *expected) {
   mjs_val_t v;
-  if (mjs_exec(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
+  if (mjs_eval(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
   return check_str(mjs, v, expected);
 }
 
 static int typeexpr(struct mjs *mjs, const char *code, mjs_type_t t) {
   mjs_val_t v;
-  return mjs_exec(mjs, code, strlen(code), &v) == MJS_SUCCESS &&
+  return mjs_eval(mjs, code, strlen(code), &v) == MJS_SUCCESS &&
          mjs_type(v) == t;
 }
 
@@ -39,7 +39,7 @@ static void test_expr(void) {
   struct mjs *mjs = mjs_create();
 
   assert(typeexpr(mjs, "let a", MJS_UNDEFINED));
-  assert(mjs_exec(mjs, "let a", 5, NULL) == MJS_FAILURE);
+  assert(mjs_eval(mjs, "let a", 5, NULL) == MJS_FAILURE);
   assert(typeexpr(mjs, "let ax, bx = function(x){}", MJS_FUNCTION));
   assert(typeexpr(mjs, "let ay, by = function(x){}, c", MJS_UNDEFINED));
 
