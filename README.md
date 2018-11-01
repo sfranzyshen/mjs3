@@ -14,7 +14,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
   at run time. Upon OOM, the VM is halted
 - Object pool, property pool, and string pool sizes are defined at compile time
 - The minimal configuration takes only a few hundred bytes of RAM
-- Runtime RAM usage: an object takes 6 bytes, a property takes 16 bytes,
+- RAM usage: an object takes 6 bytes, each property takes 16 bytes,
   a string takes length + 6 bytes, any other type takes 4 bytes
 - Strings are byte strings, not Unicode.
   For example, `'ы'.length === 2`, `'ы'[0] === '\xd1'`, `'ы'[1] === '\x8b'`
