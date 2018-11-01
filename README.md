@@ -24,17 +24,12 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ## Supported operations and constructs
 
-| Name              |  Operation                                |
-| ----------------- | ----------------------------------------- |
-| Operations        | `\|\|`, `&&`, `\|`, `^`, `&`, `<<`, `>>`, `>>>`, <br> `>`, `<`, `>=`, `<=` |
-| Ternary           | `... ? ... : ...`                         |
-| Assignments       | `\|=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  |
-| Arithmetic        | `+`, `-`, `*`, `/`, `%`, `**`             |
-| Strict equality   | `!==`, `!==`                              |
-| Prefix, postfix, unary   | `--...`, `++...`, `...++`, `...-- `, `+...`, `-...` |
-| typeof            | `typeof(some_variable)`                   |
-| for..in loop      | `for (let k in obj) { ... }`              |
-| delete            | `delete obj.k`                            |
+| Name              |  Operation                   |
+| ----------------- | ---------------------------- |
+| Operations        | All but `!=`, `==`           |
+| typeof            | `typeof(...)`                |
+| for..in loop      | `for (let k in obj) { ... }` |
+| delete            | `delete obj.k`               |
 | Variable decl     | `let a, b, c = 12.3, d = 'a'; ` |
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
