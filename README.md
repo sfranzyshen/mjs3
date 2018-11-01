@@ -20,6 +20,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
   For example, `'ы'.length === 2`, `'ы'[0] === '\xd1'`, `'ы'[1] === '\x8b'`
 - Limitations: max string length is 256 bytes, numbers hold either
   32-bit integer value or 32-bit float value, no standard JS library
+- mJS VM executes JS source directly, no AST/bytecode is generated
 
 ## Supported operations and constructs
 
