@@ -21,9 +21,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
  `'ы'[0] === '\xd1'`, `'ы'[1] === '\x8b'`
 - Strict mode only
 
-## Supported syntax and API
-
-Supported operations and constructs
+## Supported operations and constructs
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
@@ -33,7 +31,7 @@ Supported operations and constructs
 | Arithmetic ops    | `+`, `-`, `*`, `/`, `%`                   |
 | Strict equality   | `!==`, `!==`                              |
 
-Not supported operations and constructs
+## Not supported operations and constructs
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
