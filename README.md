@@ -4,13 +4,13 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
 
-mJS is a single-header JavaScript engine library for microcontrollers.
-mJS is designed for small footprint and C/C++ interoperability.
+mJS is a single-header JavaScript engine for microcontrollers.
 
 ## Features
 
 - Clean ISO C, ISO C++. Builds on VC98, modern compilers, 8-bit Arduinos, etc
 - No dependencies
+- Implements a restricted subset of ES6 with limitations
 - Preallocates all necessary memory and never calls `malloc`, `realloc` in
   the run time. On OOM, the VM is halted
 - Object pool, property pool, and string pool sizes are defined at compile time
@@ -23,12 +23,14 @@ mJS is designed for small footprint and C/C++ interoperability.
 
 ## Supported syntax and API
 
-| Name |  Operation  | Supported |
-| ---- | ----------- | --------- |
-| Arith ops | `+`, `-`, `*`, `/`, `%`    |  :white_check_mark: yes |
-| Equality| `==`, `!=`                 |  :x: no |
-| Strict equality | `!==`, `!==`               |  :white_check_mark: yes |
-| Closures | | :x: no |
+| Name              |  Operation                                | Supported |
+| ----------------- | ----------------------------------------- | ------ |
+| Closures          |                                           | :x: no |
+| Ternary           | `... ? ... : ...`                         | yes    |
+| Assignments       | `|=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  | yes    |
+| Arithmetic ops    | `+`, `-`, `*`, `/`, `%`                   | yes    |
+| Equality          | `==`, `!=`                                | no :x: |
+| Strict equality   | `!==`, `!==`                              | yes    |
 
 ## Usage example
 
