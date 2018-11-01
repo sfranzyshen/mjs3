@@ -28,13 +28,14 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Comparison        | `>`, `<`, `>=`, `<=`                      |
 | Ternary           | `... ? ... : ...`                         |
 | Assignments       | `\|=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  |
-| Arithmetic ops    | `+`, `-`, `*`, `/`, `%`, `**`             |
+| Arithmetic        | `+`, `-`, `*`, `/`, `%`, `**`             |
 | Strict equality   | `!==`, `!==`                              |
 | Prefix, postfix, unary   | `--...`, `++...`, `...++`, `...-- `, `+...`, `-...` |
 | typeof            | `typeof(some_variable)`                   |
 | for..in loop      | `for (let k in obj) { ... }`              |
 | delete            | `delete obj.k`                            |
-| Variable declaration | `let a, b, c = 12.3, d = 'a'; ` |
+| Variable decl     | `let a, b, c = 12.3, d = 'a'; ` |
+| Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
 | Arrays            | `let arr = [1, 2, 'hi there']` |
