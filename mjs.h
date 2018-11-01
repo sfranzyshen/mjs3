@@ -132,8 +132,8 @@ struct vm {
   ind_t csp;                              // Points to the top of the call stack
   struct obj objs[MJS_OBJ_POOL_SIZE];     // Objects pool
   struct prop props[MJS_PROP_POOL_SIZE];  // Props pool
-  char stringbuf[MJS_STRING_POOL_SIZE];   // String pool
-  ind_t sblen;                            // String pool current length
+  uint8_t stringbuf[MJS_STRING_POOL_SIZE];  // String pool
+  ind_t sblen;                              // String pool current length
 };
 
 typedef enum { MJS_SUCCESS, MJS_FAILURE } err_t;
@@ -276,9 +276,9 @@ static err_t mk_str(struct vm *vm, const char *p, len_t len, val_t *v) {
 }
 
 char *mjs_get_string(struct vm *vm, val_t v, len_t *len) {
-  char *p = vm->stringbuf + VAL_PAYLOAD(v);
-  if (len != NULL) *len = ((unsigned char) p[0]) & 0xff;
-  return p + 1;
+  uint8_t *p = vm->stringbuf + VAL_PAYLOAD(v);
+  if (len != NULL) *len = p[0];
+  return (char *) p + 1;
 }
 
 static err_t mjs_concat(struct vm *vm, val_t v1, val_t v2, val_t *v) {
