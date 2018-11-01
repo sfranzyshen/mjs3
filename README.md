@@ -66,7 +66,7 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 
 ## Usage example
 
-See `main.c`
+See `example.c`
 
 ## LICENSE
 

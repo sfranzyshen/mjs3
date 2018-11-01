@@ -6,12 +6,12 @@ TFLAGS += -DMJS_PROP_POOL_SIZE=30 -DMJS_STRING_POOL_SIZE=200
 all: $(PROG)
 .PHONY: test $(PROG)
 
-$(PROG): mjs.h main.c
-	$(CC) -o $@ main.c -DNDEBUG $(CFLAGS) $(MFLAGS)
+$(PROG): mjs.h example.c
+	$(CC) -o $@ example.c -DNDEBUG $(CFLAGS) $(MFLAGS)
 
 VC98 = docker run -v $(CURDIR):$(CURDIR) -w $(CURDIR) docker.io/mgos/vc98
-vc98: mjs.h main.c
-	$(VC98) wine cl main.c /nologo /W4 /O1 /DNDEBUG $(MFLAGS) /Fe$(PROG).exe
+vc98: mjs.h example.c
+	$(VC98) wine cl example.c /nologo /W4 /O1 /DNDEBUG $(MFLAGS) /Fe$(PROG).exe
 	$(VC98) wine $(PROG).exe -e 'let a = 1 + 2;'
 
 test: unit_test.c mjs.h
