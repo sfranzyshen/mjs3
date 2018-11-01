@@ -29,8 +29,9 @@ typedef uint32_t mjs_val_t;
 typedef uint32_t mjs_len_t;
 
 // API
-struct mjs *mjs_create(void);    // Create instance
-void mjs_destroy(struct mjs *);  // Destroy instance
+struct mjs *mjs_create(void);            // Create instance
+void mjs_destroy(struct mjs *);          // Destroy instance
+mjs_val_t mjs_get_global(struct mjs *);  // Get global namespace object
 mjs_val_t mjs_eval(struct mjs *mjs, const char *buf, int len);  // Evaluate
 const char *mjs_stringify(struct mjs *, mjs_val_t v);  // Stringify value
 unsigned long mjs_size(void);                          // Get VM size
@@ -166,24 +167,23 @@ static err_t vm_err(struct vm *vm, const char *fmt, ...) {
   return MJS_FAILURE;
 }
 
+union mjs_type_holder {
+  val_t v;
+  float f;
+};
+
 static mjs_type_t mjs_type(val_t v) {
   return IS_FLOAT(v) ? MJS_TYPE_NUMBER : VAL_TYPE(v);
 }
 
 static val_t tov(float f) {
-  union {
-    val_t v;
-    float f;
-  } u;
+  union mjs_type_holder u;
   u.f = f;
   return u.v;
 }
 
 static float tof(val_t v) {
-  union {
-    val_t v;
-    float f;
-  } u;
+  union mjs_type_holder u;
   u.v = v;
   return u.f;
 }
@@ -239,7 +239,6 @@ static void vm_dump(const struct vm *vm) {
 
 ////////////////////////////////////// VM ////////////////////////////////////
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
-float mjs_get_number(val_t v) { return tof(v); }
 
 static err_t vm_push(struct vm *vm, val_t v) {
   if (vm->sp < ARRSIZE(vm->data_stack)) {
@@ -1189,6 +1188,8 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   return v;
 }
 
+float mjs_get_number(val_t v) { return tof(v); }
+mjs_val_t mjs_get_global(struct vm *vm) { return vm->call_stack[0]; }
 const char *mjs_stringify(struct vm *vm, val_t v) { return tostr(vm, v); }
 
 #endif  // MJS_H
