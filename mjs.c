@@ -158,6 +158,9 @@ static void vm_dump(const struct vm *vm) {
          (int) sizeof(vm->stringbuf));
   printf("[VM]  sp %d, csp %d, sb %d\n", vm->sp, vm->csp, vm->sblen);
 }
+#else
+#define vm_dump(x)
+#define tostr(x, y) ":)"
 #endif
 
 static val_t mkval(mjs_type_t t, ind_t payload) {

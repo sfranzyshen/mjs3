@@ -14,7 +14,7 @@ static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
   mjs_len_t len;
   const char *p = mjs_get_string(mjs, v, &len);
   printf("%d %u [%.*s] [%s] %lu\n", mjs_type(v), len, len, p, expected,
-         strlen(expected));
+         (unsigned long) strlen(expected));
   return mjs_type(v) == MJS_STRING && len == strlen(expected) &&
          memcmp(p, expected, len) == 0;
 }
