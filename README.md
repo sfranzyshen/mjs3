@@ -44,6 +44,8 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | var               | `var ...`  (note: use `let ...`) |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
 | Const, etc        | `const ...`, `await ...` , `void ...` , `new ...`, `instanceof ...`  |
+| Standard types    | No `Date`, `ReGexp`, `Function`, `String`, `Number` |
+| Prototypes        | No prototype based inheritance |
 
 ## JS API Reference
 
