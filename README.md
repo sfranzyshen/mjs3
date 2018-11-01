@@ -25,13 +25,18 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
-| Logical, bitwise  | `\|\|`, `&&`, `\|`, `^`, `&`              |
+| Logical, bitwise  | `\|\|`, `&&`, `\|`, `^`, `&`, `<<`, `>>`, `>>>`   |
 | Ternary           | `... ? ... : ...`                         |
 | Assignments       | `\|=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  |
-| Arithmetic ops    | `+`, `-`, `*`, `/`, `%`                   |
+| Arithmetic ops    | `+`, `-`, `*`, `/`, `%`, `**`             |
 | Strict equality   | `!==`, `!==`                              |
+| Prefix, postfix, unary   | `--...`, `++...`, `...++`, `...-- `, `+...`, `-...` |
 | typeof            | `typeof(some_variable)`                   |
 | for..in loop      | `for (let k in obj) { ... }`              |
+| delete            | `delete obj.k`                            |
+| Functions         | `let f = function(x, y) { return x + y; }; ` |
+| Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
+| Arrays            | `let arr = [1, 2, 'hi there']` |
 
 ## Not supported operations and constructs
 
@@ -40,6 +45,9 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Equality          | `==`, `!=`                                |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
 | instanceof        | `instanceof some_variable` |
+| await             | `await ...` |
+| void              | `void ...` |
+| new               | `new ...` |
 
 ## Usage example
 
