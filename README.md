@@ -40,11 +40,11 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
 | Arrays            | `let arr = [1, 2, 'hi there']` |
 
-## Not supported operations and constructs
+## Unsupported operations and constructs
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
-| Equality          | `==`, `!=`                                |
+| Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
 | instanceof        | `instanceof some_variable` |
 | const             | `const ...` |
