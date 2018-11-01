@@ -44,11 +44,11 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 // VM tunables
 
 #ifndef MJS_DATA_STACK_SIZE
-#define MJS_DATA_STACK_SIZE 15
+#define MJS_DATA_STACK_SIZE 10
 #endif
 
 #ifndef MJS_CALL_STACK_SIZE
-#define MJS_CALL_STACK_SIZE 15
+#define MJS_CALL_STACK_SIZE 10
 #endif
 
 #ifndef MJS_STRING_POOL_SIZE
@@ -56,7 +56,7 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 #endif
 
 #ifndef MJS_OBJ_POOL_SIZE
-#define MJS_OBJ_POOL_SIZE 7
+#define MJS_OBJ_POOL_SIZE 5
 #endif
 
 #ifndef MJS_PROP_POOL_SIZE
