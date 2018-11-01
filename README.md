@@ -14,12 +14,12 @@ mJS is a single-header JavaScript engine for microcontrollers.
   at run time. Upon OOM, the VM is halted
 - Object pool, property pool, and string pool sizes are defined at compile time
 - The minimal configuration takes only a few hundred bytes of RAM
-- RAM usage: an object takes 6 bytes, each property takes 16 bytes,
-  a string takes length + 6 bytes, any other type takes 4 bytes
+- RAM usage: an object takes 6 bytes, each property: 16 bytes,
+  a string: length + 6 bytes, any other type: 4 bytes
 - Strings are byte strings, not Unicode.
   For example, `'ы'.length === 2`, `'ы'[0] === '\xd1'`, `'ы'[1] === '\x8b'`
-- Limitations: max string length is 256 bytes, numbers hold either
-  32-bit integer value or 32-bit float value, no standard JS library
+- Limitations: max string length is 256 bytes, numbers hold
+  32-bit float value, no standard JS library
 - mJS VM executes JS source directly, no AST/bytecode is generated
 
 ## Supported operations and constructs
