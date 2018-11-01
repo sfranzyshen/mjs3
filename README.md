@@ -8,7 +8,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ## Features
 
-- Clean ISO C, ISO C++. Builds on VC98, modern compilers, 8-bit Arduinos, etc
+- Clean ISO C, ISO C++. Builds on old (VC98) and modern compilers, from 8-bit (e.g. Arduino mini) to 64-bit systems
 - No dependencies
 - Implements a restricted subset of ES6 with limitations
 - Preallocates all necessary memory and never calls `malloc`, `realloc`
