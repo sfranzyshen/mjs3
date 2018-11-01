@@ -718,7 +718,7 @@ static err_t parse_block(struct parser *p, int mkscope) {
 
 static err_t parse_function(struct parser *p) {
   err_t res = MJS_SUCCESS;
-  int arg_no = 0, name_provided = 0, old_sp;
+  int arg_no = 0, name_provided = 0;
   struct tok tmp = p->tok;
   LOG((DBGPREFIX "%s: START: [%d]\n", __func__, p->vm->sp));
   p->noexec++;
