@@ -25,6 +25,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
 | Logical, bitwise  | `\|\|`, `&&`, `\|`, `^`, `&`, `<<`, `>>`, `>>>`   |
+| Comparison        | `>`, `<`, `>=`, `<=`                      |
 | Ternary           | `... ? ... : ...`                         |
 | Assignments       | `\|=`, `^=`, `&=`, `>>>=`, `>>=`, `<<=`, `%=`, `/=`, `*=`, `**=`, `-=`, `+=`, `=`  |
 | Arithmetic ops    | `+`, `-`, `*`, `/`, `%`, `**`             |
