@@ -47,8 +47,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | var               | `var ...`  (note: use `let ...`) |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
-| instanceof        | `instanceof ...` |
-| const, await, void, new | `const ...`, `await ...` , `void ...` , `new ...`  |
+| Const, etc        | `const ...`, `await ...` , `void ...` , `new ...`, `instanceof ...`  |
 
 ## Usage example
 
