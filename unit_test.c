@@ -6,42 +6,39 @@
 #include <string.h>
 
 static int check_num(mjs_val_t v, float expected) {
-  return mjs_type(v) == MJS_NUMBER &&
+  return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_get_number(v) - expected) < 0.0001;
 }
 
 static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
   mjs_len_t len;
   const char *p = mjs_get_string(mjs, v, &len);
-  return mjs_type(v) == MJS_STRING && len == strlen(expected) &&
+  return mjs_type(v) == MJS_TYPE_STRING && len == strlen(expected) &&
          memcmp(p, expected, len) == 0;
 }
 
 static int numexpr(struct mjs *mjs, const char *code, float expected) {
-  mjs_val_t v;
-  if (mjs_eval(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
-  return check_num(v, expected);
+  mjs_val_t v = mjs_eval(mjs, code, strlen(code));
+  return mjs_type(v) != MJS_TYPE_NUMBER ? 0 : check_num(v, expected);
 }
 
 static int strexpr(struct mjs *mjs, const char *code, const char *expected) {
-  mjs_val_t v;
-  if (mjs_eval(mjs, code, strlen(code), &v) != MJS_SUCCESS) return 0;
-  return check_str(mjs, v, expected);
+  mjs_val_t v = mjs_eval(mjs, code, strlen(code));
+  return mjs_type(v) != MJS_TYPE_STRING ? 0 : check_str(mjs, v, expected);
 }
 
 static int typeexpr(struct mjs *mjs, const char *code, mjs_type_t t) {
-  mjs_val_t v;
-  return mjs_eval(mjs, code, strlen(code), &v) == MJS_SUCCESS &&
-         mjs_type(v) == t;
+  mjs_val_t v = mjs_eval(mjs, code, strlen(code));
+  return mjs_type(v) == t;
 }
 
 static void test_expr(void) {
   struct mjs *mjs = mjs_create();
 
-  assert(typeexpr(mjs, "let a", MJS_UNDEFINED));
-  assert(mjs_eval(mjs, "let a", 5, NULL) == MJS_FAILURE);
-  assert(typeexpr(mjs, "let ax, bx = function(x){}", MJS_FUNCTION));
-  assert(typeexpr(mjs, "let ay, by = function(x){}, c", MJS_UNDEFINED));
+  assert(mjs_eval(mjs, "let a", -1) == MJS_UNDEFINED);
+  assert(mjs_eval(mjs, "let a", -1) == MJS_ERROR);
+  assert(typeexpr(mjs, "let ax, bx = function(x){}", MJS_TYPE_FUNCTION));
+  assert(typeexpr(mjs, "let ay, by = function(x){}, c", MJS_TYPE_UNDEFINED));
 
   assert(numexpr(mjs, "let aq = 1;", 1.0f));
   assert(numexpr(mjs, "let aw = 1, be = 2;", 2.0f));

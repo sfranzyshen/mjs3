@@ -45,23 +45,13 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
 | Const, etc        | `const ...`, `await ...` , `void ...` , `new ...`, `instanceof ...`  |
 
-## Usage example
-
-```c
-#include "mjs.h"
-
-int main(void) {
-  struct mjs *mjs = mjs_create();
-  mjs_val_t result;
-  mjs_eval(mjs, "let a = 1; a++;", -1, &result);
-  mjs_destroy(mjs);
-  return 0;
-}
-```
-
 ## JS API Reference
 
 ## C API Reference
+
+## Usage example
+
+See `main.c`
 
 ## LICENSE
 
