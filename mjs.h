@@ -22,16 +22,19 @@ typedef unsigned char uint8_t;
 #pragma warning(disable : 4127)
 #endif
 
-// Types
 #define mjs vm  // Aliasing `struct mjs` to `struct vm`
+
+// Types
 typedef uint32_t mjs_val_t;
 typedef uint32_t mjs_len_t;
 
 // API
-struct mjs *mjs_create(void);                   // Create instance
-void mjs_destroy(struct mjs *);                 // Destroy instance
-const char *mjs_get_error(const struct mjs *);  // Get error message
+struct mjs *mjs_create(void);    // Create instance
+void mjs_destroy(struct mjs *);  // Destroy instance
 mjs_val_t mjs_eval(struct mjs *mjs, const char *buf, int len);  // Evaluate
+const char *mjs_stringify(struct mjs *, mjs_val_t v);  // Stringify value
+unsigned long mjs_size(void);                          // Get VM size
+
 float mjs_get_number(mjs_val_t v);
 char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 
@@ -185,7 +188,6 @@ static float tof(val_t v) {
   return u.f;
 }
 
-#ifdef MJS_DEBUG
 static const char *tostr(struct vm *vm, val_t v) {
   static char buf[64];
   const char *names[] = {"(undefined)", "(null)",   "(true)",  "(false)",
@@ -214,6 +216,7 @@ static const char *tostr(struct vm *vm, val_t v) {
   return buf;
 }
 
+#ifdef MJS_DEBUG
 static void vm_dump(const struct vm *vm) {
   ind_t i;
   printf("[VM] %8s: ", "objs");
@@ -232,7 +235,6 @@ static void vm_dump(const struct vm *vm) {
 }
 #else
 #define vm_dump(x)
-#define tostr(x, y) ":)"
 #endif
 
 ////////////////////////////////////// VM ////////////////////////////////////
@@ -1186,5 +1188,7 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
   return v;
 }
+
+const char *mjs_stringify(struct vm *vm, val_t v) { return tostr(vm, v); }
 
 #endif  // MJS_H

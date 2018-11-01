@@ -48,6 +48,22 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ## C API Reference
 
+```c
+// Types
+typedef uint32_t mjs_val_t;
+typedef uint32_t mjs_len_t;
+
+// API
+struct mjs *mjs_create(void);    // Create instance
+void mjs_destroy(struct mjs *);  // Destroy instance
+mjs_val_t mjs_eval(struct mjs *mjs, const char *buf, int len);  // Evaluate
+const char *mjs_stringify(struct mjs *, mjs_val_t v);  // Stringify value
+unsigned long mjs_size(void);                          // Get VM size
+
+float mjs_get_number(mjs_val_t v);
+char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
+```
+
 ## Usage example
 
 See `main.c`
