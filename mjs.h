@@ -1178,7 +1178,7 @@ struct vm *mjs_create(void) {
 void mjs_destroy(struct vm *vm) { free(vm); }
 
 val_t mjs_eval(struct vm *vm, const char *buf, int len) {
-  struct parser p = mk_parser(vm, buf, len >= 0 ? len : strlen(buf));
+  struct parser p = mk_parser(vm, buf, len >= 0 ? len : (int) strlen(buf));
   val_t v = MJS_ERROR;
   vm->error_message[0] = '\0';
   if (parse_statement_list(&p, TOK_EOF) == MJS_SUCCESS && vm->sp == 1) {
