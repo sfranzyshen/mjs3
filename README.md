@@ -29,7 +29,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Operations        | All but `!=`, `==`. Use `!==`, `===` |
 | typeof            | `typeof(...)`                |
 | delete            | `delete obj.k`               |
-| for, while, for..in  | `for (let k in obj) { ... }` |
+| for, while, for..in  | `for (let k in obj) { ... }`, `while (...) {...}`, `for (...) { ... }` |
 | Declations        | `let a, b, c = 12.3, d = 'a'; ` |
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
