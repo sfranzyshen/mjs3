@@ -11,15 +11,14 @@ mJS is a single-header JavaScript engine for microcontrollers.
 - Clean ISO C, ISO C++. Builds on VC98, modern compilers, 8-bit Arduinos, etc
 - No dependencies
 - Implements a restricted subset of ES6 with limitations
-- Preallocates all necessary memory and never calls `malloc`, `realloc` in
-  the run time. On OOM, the VM is halted
+- Preallocates all necessary memory and never calls `malloc`, `realloc`
+  at run time. Upon OOM, the VM is halted
 - Object pool, property pool, and string pool sizes are defined at compile time
-- The minimal configuration takes only a **few hundred** bytes of RAM
+- The minimal configuration takes only a few hundred bytes of RAM
 - Runtime RAM usage: an object takes 6 bytes, a property takes 16 bytes,
-  a string takes string length + 6 bytes, any other type takes 4 bytes
-- mJS strings are byte strings, not Unicode strings: `'ы'.length === 2`,
- `'ы'[0] === '\xd1'`, `'ы'[1] === '\x8b'`
-- Strict mode only
+  a string takes length + 6 bytes, any other type takes 4 bytes
+- mJS strings are byte strings, not Unicode strings.
+  For example, `'ы'.length === 2`, `'ы'[0] === '\xd1'`, `'ы'[1] === '\x8b'`
 
 ## Supported operations and constructs
 
@@ -34,6 +33,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | typeof            | `typeof(some_variable)`                   |
 | for..in loop      | `for (let k in obj) { ... }`              |
 | delete            | `delete obj.k`                            |
+| Variable declaration | `let a, b, c = 12.3, d = 'a'; ` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
 | Arrays            | `let arr = [1, 2, 'hi there']` |
