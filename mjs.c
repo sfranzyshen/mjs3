@@ -739,7 +739,6 @@ static err_t parse_function(struct parser *p) {
   }
   EXPECT(p, ')');
   pnext(p);
-  old_sp = p->vm->sp;
   TRY(parse_block(p, 0));
   if (name_provided) TRY(do_op(p, '='));
   {
