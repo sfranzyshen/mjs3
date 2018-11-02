@@ -34,10 +34,13 @@ void mjs_destroy(struct mjs *);          // Destroy instance
 mjs_val_t mjs_get_global(struct mjs *);  // Get global namespace object
 mjs_val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
 mjs_val_t mjs_set(struct vm *, mjs_val_t obj, mjs_val_t key,
-                  mjs_val_t val);                            // Set attribute
-const char *mjs_stringify(struct mjs *, mjs_val_t v);        // Stringify value
-unsigned long mjs_size(void);                                // Get VM size
-float mjs_get_number(mjs_val_t v);                           // Unpack number
+                  mjs_val_t val);                      // Set attribute
+const char *mjs_stringify(struct mjs *, mjs_val_t v);  // Stringify value
+unsigned long mjs_size(void);                          // Get VM size
+mjs_val_t mjs_nargs(struct mjs *);     // Get number of arguments (in a func)
+mjs_val_t mjs_arg(struct mjs *, int);  // Get argument (in a function)
+void mjs_return(struct mjs *, mjs_val_t);  // Return value from a function
+float mjs_get_number(mjs_val_t v);         // Unpack number
 char *mjs_get_string(struct mjs *, mjs_val_t, mjs_len_t *);  // Unpack string
 
 #if defined(__cplusplus)
@@ -113,7 +116,7 @@ typedef uint32_t tok_t;
 typedef enum {
   MJS_TYPE_UNDEFINED, MJS_TYPE_NULL, MJS_TYPE_TRUE, MJS_TYPE_FALSE,
   MJS_TYPE_STRING, MJS_TYPE_OBJECT, MJS_TYPE_ARRAY, MJS_TYPE_FUNCTION,
-  MJS_TYPE_NUMBER, MJS_TYPE_ERROR
+  MJS_TYPE_NUMBER, MJS_TYPE_ERROR, MJS_TYPE_C_FUNCTION,
 } mjs_type_t;
 // clang-format on
 
@@ -190,29 +193,33 @@ static float tof(val_t v) {
   return u.f;
 }
 
+static const char *mjs_typeof(val_t v) {
+  const char *names[] = {"undefined", "null",   "true",   "false",
+                         "string",    "object", "object", "function",
+                         "number",    "error",  "?",      "?",
+                         "?",         "?",      "?",      "?"};
+  return names[mjs_type(v)];
+}
+
 static const char *tostr(struct vm *vm, val_t v) {
   static char buf[64];
-  const char *names[] = {"(undefined)", "(null)",   "(true)",  "(false)",
-                         "(string)",    "(object)", "(array)", "(function)",
-                         "(number)",    "?",        "?",       "?",
-                         "?",           "?",        "?",       "?"};
   mjs_type_t t = mjs_type(v);
   switch (t) {
     case MJS_TYPE_NUMBER:
-      snprintf(buf, sizeof(buf), "(number) %g", tof(v));
+      snprintf(buf, sizeof(buf), "%g", tof(v));
       break;
     case MJS_TYPE_STRING:
     case MJS_TYPE_FUNCTION: {
       len_t len;
       const char *ptr = mjs_get_string(vm, v, &len);
-      snprintf(buf, sizeof(buf), "%s [%.*s]", names[t], len, ptr);
+      snprintf(buf, sizeof(buf), "%.*s", len, ptr);
       break;
     }
     case MJS_TYPE_ERROR:
-      snprintf(buf, sizeof(buf), "(error) %s", vm->error_message);
+      snprintf(buf, sizeof(buf), "ERROR: %s", vm->error_message);
       break;
     default:
-      snprintf(buf, sizeof(buf), "%s", names[t]);
+      snprintf(buf, sizeof(buf), "%s", mjs_typeof(v));
       break;
   }
   return buf;

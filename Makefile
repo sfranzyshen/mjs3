@@ -1,6 +1,6 @@
 PROG = mjs
 CFLAGS += -W -Wall -Werror -Wstrict-overflow -fno-strict-aliasing -Os -g
-MFLAGS += -DMJS_DEBUG
+#MFLAGS += -DMJS_DEBUG
 TFLAGS += -DMJS_PROP_POOL_SIZE=30 -DMJS_STRING_POOL_SIZE=200
 
 all: $(PROG)

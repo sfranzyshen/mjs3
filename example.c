@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
   }
-  printf("RESULT: %s\n", mjs_stringify(mjs, val));
+  printf("%s\n", mjs_stringify(mjs, val));
   mjs_destroy(mjs);
   return EXIT_SUCCESS;
 }
