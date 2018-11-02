@@ -89,6 +89,9 @@ char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
 
 #define MJS_UNDEFINED MK_VAL(MJS_TYPE_UNDEFINED, 0)
 #define MJS_ERROR MK_VAL(MJS_TYPE_ERROR, 0)
+#define MJS_TRUE MK_VAL(MJS_TYPE_TRUE, 0)
+#define MJS_FALSE MK_VAL(MJS_TYPE_FALSE, 0)
+#define MJS_NULL MK_VAL(MJS_TYPE_NULL, 0)
 
 #include <assert.h>
 #include <float.h>
@@ -140,8 +143,6 @@ struct vm {
   ind_t sblen;                              // String pool current length
 };
 
-typedef enum { MJS_SUCCESS, MJS_FAILURE } err_t;
-
 #define ARRSIZE(x) ((sizeof(x) / sizeof((x)[0])))
 
 #define DBGPREFIX "[DEBUG] "
@@ -151,20 +152,20 @@ typedef enum { MJS_SUCCESS, MJS_FAILURE } err_t;
 #define LOG(x)
 #endif
 
-#define TRY(expr)                       \
-  do {                                  \
-    res = expr;                         \
-    if (res != MJS_SUCCESS) return res; \
+#define TRY(expr)                     \
+  do {                                \
+    res = expr;                       \
+    if (res == MJS_ERROR) return res; \
   } while (0)
 
 //////////////////////////////////// HELPERS /////////////////////////////////
-static err_t vm_err(struct vm *vm, const char *fmt, ...) {
+static val_t vm_err(struct vm *vm, const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
   vsnprintf(vm->error_message, sizeof(vm->error_message), fmt, ap);
   va_end(ap);
-  LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
-  return MJS_FAILURE;
+  // LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
+  return MJS_ERROR;
 }
 
 union mjs_type_holder {
@@ -240,39 +241,39 @@ static void vm_dump(const struct vm *vm) {
 ////////////////////////////////////// VM ////////////////////////////////////
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 
-static err_t vm_push(struct vm *vm, val_t v) {
+static val_t vm_push(struct vm *vm, val_t v) {
   if (vm->sp < ARRSIZE(vm->data_stack)) {
     LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
     vm->data_stack[vm->sp] = v;
     vm->sp++;
-    return MJS_SUCCESS;
+    return MJS_TRUE;
   } else {
     return vm_err(vm, "stack overflow");
   }
 }
 
-static err_t vm_drop(struct vm *vm) {
+static val_t vm_drop(struct vm *vm) {
   if (vm->sp > 0) {
     LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
     vm->sp--;
-    return MJS_SUCCESS;
+    return MJS_TRUE;
   } else {
     return vm_err(vm, "stack underflow");
   }
 }
 
-static err_t mk_str(struct vm *vm, const char *p, len_t len, val_t *v) {
+static val_t mk_str(struct vm *vm, const char *p, len_t len) {
   if (len > 0xff) {
     return vm_err(vm, "string is too long");
   } else if (len + 2 > sizeof(vm->stringbuf) - vm->sblen) {
     return vm_err(vm, "string OOM");
   } else {
-    *v = MK_VAL(MJS_TYPE_STRING, vm->sblen);
-    vm->stringbuf[vm->sblen++] = (char) (len & 0xff);   // save
-    if (p) memmove(&vm->stringbuf[vm->sblen], p, len);  // copy data
-    vm->sblen += (ind_t) len;                           // data will be here
-    vm->stringbuf[vm->sblen++] = '\0';                  // nul-terminate
-    return MJS_SUCCESS;
+    val_t v = MK_VAL(MJS_TYPE_STRING, vm->sblen);
+    vm->stringbuf[vm->sblen++] = (uint8_t)(len & 0xff);  // save length
+    if (p) memmove(&vm->stringbuf[vm->sblen], p, len);   // copy data
+    vm->sblen += len;                                    // data will be here
+    vm->stringbuf[vm->sblen++] = '\0';                   // nul-terminate
+    return v;
   }
 }
 
@@ -282,16 +283,16 @@ char *mjs_get_string(struct vm *vm, val_t v, len_t *len) {
   return (char *) p + 1;
 }
 
-static err_t mjs_concat(struct vm *vm, val_t v1, val_t v2, val_t *v) {
-  err_t res = MJS_SUCCESS;
+static val_t mjs_concat(struct vm *vm, val_t v1, val_t v2) {
+  val_t v = MJS_ERROR;
   len_t n1, n2;
   char *p1 = mjs_get_string(vm, v1, &n1), *p2 = mjs_get_string(vm, v2, &n2);
-  if ((res = mk_str(vm, NULL, n1 + n2, v)) == MJS_SUCCESS) {
-    char *p = mjs_get_string(vm, *v, NULL);
+  if ((v = mk_str(vm, NULL, n1 + n2)) != MJS_ERROR) {
+    char *p = mjs_get_string(vm, v, NULL);
     memmove(p, p1, n1);
     memmove(p + n1, p2, n2);
   }
-  return res;
+  return v;
 }
 
 static val_t mk_obj(struct vm *vm) {
@@ -303,27 +304,27 @@ static val_t mk_obj(struct vm *vm) {
     vm->objs[i].props = INVALID_INDEX;
     return MK_VAL(MJS_TYPE_OBJECT, i);
   }
-  vm_err(vm, "obj OOM");
-  return MJS_UNDEFINED;
+  return vm_err(vm, "obj OOM");
 }
 
-static err_t mk_func(struct vm *vm, const char *code, int len, val_t *v) {
-  err_t res = mk_str(vm, code, len, v);
-  if (res == MJS_SUCCESS) {
-    *v &= ~((val_t) 0x0f << 19);
-    *v |= (val_t) MJS_TYPE_FUNCTION << 19;
+static val_t mk_func(struct vm *vm, const char *code, int len) {
+  val_t v = mk_str(vm, code, len);
+  if (v != MJS_ERROR) {
+    v &= ~((val_t) 0x0f << 19);
+    v |= (val_t) MJS_TYPE_FUNCTION << 19;
   }
-  return MJS_SUCCESS;
+  return v;
 }
 
-static err_t create_scope(struct vm *vm) {
+static val_t create_scope(struct vm *vm) {
+  val_t scope;
   if (vm->csp >= ARRSIZE(vm->call_stack) - 1) {
     return vm_err(vm, "Call stack OOM");
   }
-  vm->call_stack[vm->csp] = mk_obj(vm);  // This can set error_message
-  if (vm->error_message[0] != '\0') return MJS_FAILURE;
+  if ((scope = mk_obj(vm)) == MJS_ERROR) return MJS_ERROR;
+  vm->call_stack[vm->csp] = scope;
   vm->csp++;
-  return MJS_SUCCESS;
+  return scope;
 }
 
 // Abandon value
@@ -336,13 +337,13 @@ static void s_glaz_doloy_iz_serdca_von(struct vm *vm, val_t v) {
   }
 }
 
-static err_t delete_scope(struct vm *vm) {
+static val_t delete_scope(struct vm *vm) {
   if (vm->csp <= 0 || vm->csp >= ARRSIZE(vm->call_stack)) {
     return vm_err(vm, "Corrupt call stack");
   } else {
     s_glaz_doloy_iz_serdca_von(vm, vm->call_stack[vm->csp - 1]);
     vm->csp--;
-    return MJS_SUCCESS;
+    return MJS_TRUE;
   }
 }
 
@@ -377,20 +378,20 @@ static val_t *lookup(struct vm *vm, const char *ptr, len_t len) {
 }
 
 // Lookup variable and push its value on stack on success
-static err_t lookup_and_push(struct vm *vm, const char *ptr, len_t len) {
+static val_t lookup_and_push(struct vm *vm, const char *ptr, len_t len) {
   val_t *vp = lookup(vm, ptr, len);
   if (vp != NULL) return vm_push(vm, *vp);
   return vm_err(mjs, "[%.*s] undefined", len, ptr);
 }
 
-static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
+static val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_TYPE_OBJECT) {
     len_t len;
     const char *ptr = mjs_get_string(vm, key, &len);
     val_t *prop = findprop(vm, obj, ptr, len);
     if (prop != NULL) {
       *prop = val;
-      return MJS_SUCCESS;
+      return MJS_TRUE;
     } else {
       ind_t i, obj_index = (ind_t) VAL_PAYLOAD(obj);
       struct obj *o = &vm->objs[obj_index];
@@ -408,7 +409,7 @@ static err_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
         LOG((DBGPREFIX "%s: %s: ", __func__, tostr(vm, obj)));
         LOG(("%s -> ", tostr(vm, key)));
         LOG(("%s\n", tostr(vm, val)));
-        return MJS_SUCCESS;
+        return MJS_TRUE;
       }
       return vm_err(vm, "props OOM");
     }
@@ -638,9 +639,9 @@ static tok_t pnext(struct parser *p) {
 
 ////////////////////////////////// PARSER /////////////////////////////////
 
-static err_t parse_statement_list(struct parser *p, tok_t endtok);
-static err_t parse_expr(struct parser *p);
-static err_t parse_statement(struct parser *p);
+static val_t parse_statement_list(struct parser *p, tok_t endtok);
+static val_t parse_expr(struct parser *p);
+static val_t parse_statement(struct parser *p);
 
 #define EXPECT(p, t)                                               \
   do {                                                             \
@@ -689,18 +690,17 @@ static val_t do_arith_op(float f1, float f2, int op) {
   return tov(res);
 }
 
-static err_t do_op(struct parser *p, int op) {
+static val_t do_op(struct parser *p, int op) {
   val_t *top = vm_top(p->vm), a = top[-1], b = top[0];
-  if (p->noexec) return MJS_SUCCESS;
+  if (p->noexec) return MJS_TRUE;
   LOG((DBGPREFIX "%s: sp %d op %c %d\n", __func__, p->vm->sp, op, op));
   LOG((DBGPREFIX "    top-1 %s\n", tostr(p->vm, b)));
   LOG((DBGPREFIX "    top-2 %s\n", tostr(p->vm, a)));
   switch (op) {
     case '+':
       if (mjs_type(a) == MJS_TYPE_STRING && mjs_type(b) == MJS_TYPE_STRING) {
-        val_t v;
-        err_t res = mjs_concat(p->vm, a, b, &v);
-        if (res != MJS_SUCCESS) return res;
+        val_t v = mjs_concat(p->vm, a, b);
+        if (v == MJS_ERROR) return v;
         top[-1] = v;
         p->vm->sp--;
         break;
@@ -728,23 +728,23 @@ static err_t do_op(struct parser *p, int op) {
     }
     case '=': {
       val_t obj = p->vm->call_stack[p->vm->csp - 1];
-      err_t res = mjs_set(p->vm, obj, a, b);
+      val_t res = mjs_set(p->vm, obj, a, b);
       top[0] = a;
       top[-1] = b;
-      if (res != MJS_SUCCESS) return res;
+      if (res == MJS_ERROR) return res;
       return vm_drop(p->vm);
     }
     default:
       return vm_err(p->vm, "Unknown op: %c (%d)", op, op);
   }
-  return MJS_SUCCESS;
+  return MJS_TRUE;
 }
 
-typedef err_t bpf_t(struct parser *p, int prev_op);
+typedef val_t bpf_t(struct parser *p, int prev_op);
 
-static err_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
+static val_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
                              const int *ops, int prev_op) {
-  err_t res = MJS_SUCCESS;
+  val_t res = MJS_TRUE;
   TRY(f1(p, TOK_EOF));
   if (prev_op != TOK_EOF) TRY(do_op(p, prev_op));
   if (findtok(ops, p->tok.tok) != TOK_EOF) {
@@ -755,9 +755,9 @@ static err_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
   return res;
 }
 
-static err_t parse_rtl_binop(struct parser *p, bpf_t f1, bpf_t f2,
+static val_t parse_rtl_binop(struct parser *p, bpf_t f1, bpf_t f2,
                              const int *ops, int prev_op) {
-  err_t res = MJS_SUCCESS;
+  val_t res = MJS_TRUE;
   (void) prev_op;
   TRY(f1(p, TOK_EOF));
   if (findtok(ops, p->tok.tok) != TOK_EOF) {
@@ -776,8 +776,8 @@ static tok_t lookahead(struct parser *p) {
   return tok;
 }
 
-static err_t parse_block(struct parser *p, int mkscope) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_block(struct parser *p, int mkscope) {
+  val_t res = MJS_TRUE;
   if (mkscope && !p->noexec) TRY(create_scope(p->vm));
   TRY(parse_statement_list(p, '}'));
   EXPECT(p, '}');
@@ -785,8 +785,8 @@ static err_t parse_block(struct parser *p, int mkscope) {
   return res;
 }
 
-static err_t parse_function(struct parser *p) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_function(struct parser *p) {
+  val_t res = MJS_TRUE;
   int arg_no = 0, name_provided = 0;
   struct tok tmp = p->tok;
   LOG((DBGPREFIX "%s: START: [%d]\n", __func__, p->vm->sp));
@@ -811,8 +811,8 @@ static err_t parse_function(struct parser *p) {
   TRY(parse_block(p, 0));
   if (name_provided) TRY(do_op(p, '='));
   {
-    val_t f;
-    TRY(mk_func(p->vm, tmp.ptr, p->tok.ptr - tmp.ptr + 1, &f));
+    val_t f = mk_func(p->vm, tmp.ptr, p->tok.ptr - tmp.ptr + 1);
+    TRY(f);
     res = vm_push(p->vm, f);
   }
   p->noexec--;
@@ -820,8 +820,8 @@ static err_t parse_function(struct parser *p) {
   return res;
 }
 
-static err_t parse_literal(struct parser *p, tok_t prev_op) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_literal(struct parser *p, tok_t prev_op) {
+  val_t res = MJS_TRUE;
   (void) prev_op;
   switch (p->tok.tok) {
     case TOK_NUM:
@@ -829,8 +829,8 @@ static err_t parse_literal(struct parser *p, tok_t prev_op) {
       break;
     case TOK_STR:
       if (!p->noexec) {
-        val_t v;
-        TRY(mk_str(p->vm, p->tok.ptr, p->tok.len, &v));
+        val_t v = mk_str(p->vm, p->tok.ptr, p->tok.len);
+        TRY(v);
         TRY(vm_push(p->vm, v));
       }
       break;
@@ -877,8 +877,8 @@ static err_t parse_literal(struct parser *p, tok_t prev_op) {
   return res;
 }
 
-static err_t do_call(struct parser *p) {
-  err_t res = MJS_SUCCESS;
+static val_t do_call(struct parser *p) {
+  val_t res = MJS_TRUE;
   ind_t saved_scp = p->vm->csp;
   val_t scope, f = *vm_top(p->vm);  // Function to call
 
@@ -909,8 +909,9 @@ static err_t do_call(struct parser *p) {
 
     // Check whether we have a defined name for this argument
     if (p2.tok.tok == TOK_IDENT) {
-      val_t key, val = *vm_top(p->vm);
-      TRY(mk_str(p->vm, p2.tok.ptr, p2.tok.len, &key));
+      val_t val = *vm_top(p->vm);
+      val_t key = mk_str(p->vm, p2.tok.ptr, p2.tok.len);
+      TRY(key);
       TRY(mjs_set(p->vm, scope, key, val));
       pnext(&p2);
     }
@@ -924,8 +925,8 @@ static err_t do_call(struct parser *p) {
   return res;
 }
 
-static err_t parse_call_dot_mem(struct parser *p, int prev_op) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_call_dot_mem(struct parser *p, int prev_op) {
+  val_t res = MJS_TRUE;
   TRY(parse_literal(p, p->tok.tok));
   while (p->tok.tok == '.' || p->tok.tok == '(' || p->tok.tok == '[') {
     if (p->tok.tok == '[') {
@@ -962,8 +963,8 @@ static err_t parse_call_dot_mem(struct parser *p, int prev_op) {
   return res;
 }
 
-static err_t parse_postfix(struct parser *p, int prev_op) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_postfix(struct parser *p, int prev_op) {
+  val_t res = MJS_TRUE;
   TRY(parse_call_dot_mem(p, prev_op));
   if (p->tok.tok == DT('+', '+') || p->tok.tok == DT('-', '-')) {
     int op = p->tok.tok == DT('+', '+') ? TOK_POSTFIX_PLUS : TOK_POSTFIX_MINUS;
@@ -973,8 +974,8 @@ static err_t parse_postfix(struct parser *p, int prev_op) {
   return res;
 }
 
-static err_t parse_unary(struct parser *p, int prev_op) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_unary(struct parser *p, int prev_op) {
+  val_t res = MJS_TRUE;
   int op = TOK_EOF;
   if (findtok(s_unary_ops, p->tok.tok) != TOK_EOF) {
     op = p->tok.tok;
@@ -985,7 +986,7 @@ static err_t parse_unary(struct parser *p, int prev_op) {
   } else {
     res = parse_postfix(p, prev_op);
   }
-  if (res != MJS_SUCCESS) return res;
+  if (res == MJS_ERROR) return res;
   if (op != TOK_EOF) {
     if (op == '-') op = TOK_UNARY_MINUS;
     if (op == '+') op = TOK_UNARY_PLUS;
@@ -994,18 +995,18 @@ static err_t parse_unary(struct parser *p, int prev_op) {
   return res;
 }
 
-static err_t parse_mul_div_rem(struct parser *p, int prev_op) {
+static val_t parse_mul_div_rem(struct parser *p, int prev_op) {
   int ops[] = {'*', '/', '%', TOK_EOF};
   return parse_ltr_binop(p, parse_unary, parse_mul_div_rem, ops, prev_op);
 }
 
-static err_t parse_plus_minus(struct parser *p, int prev_op) {
+static val_t parse_plus_minus(struct parser *p, int prev_op) {
   int ops[] = {'+', '-', TOK_EOF};
   return parse_ltr_binop(p, parse_mul_div_rem, parse_plus_minus, ops, prev_op);
 }
 
-static err_t parse_ternary(struct parser *p, int prev_op) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_ternary(struct parser *p, int prev_op) {
+  val_t res = MJS_TRUE;
   TRY(parse_plus_minus(p, TOK_EOF));
   if (prev_op != TOK_EOF) do_op(p, prev_op);
   if (p->tok.tok == '?') {
@@ -1018,16 +1019,16 @@ static err_t parse_ternary(struct parser *p, int prev_op) {
   return res;
 }
 
-static err_t parse_assignment(struct parser *p, int pop) {
+static val_t parse_assignment(struct parser *p, int pop) {
   return parse_rtl_binop(p, parse_ternary, parse_assignment, s_assign_ops, pop);
 }
 
-static err_t parse_expr(struct parser *p) {
+static val_t parse_expr(struct parser *p) {
   return parse_assignment(p, TOK_EOF);
 }
 
-static err_t parse_let(struct parser *p) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_let(struct parser *p) {
+  val_t res = MJS_TRUE;
   pnext(p);
   for (;;) {
     struct tok tmp = p->tok;
@@ -1044,7 +1045,8 @@ static err_t parse_let(struct parser *p) {
     } else if (!p->noexec) {
       vm_push(p->vm, val);
     }
-    TRY(mk_str(p->vm, tmp.ptr, tmp.len, &key));
+    key = mk_str(p->vm, tmp.ptr, tmp.len);
+    TRY(key);
     TRY(mjs_set(p->vm, obj, key, val));
     LOG((DBGPREFIX "%s: sp %d, %d\n", __func__, p->vm->sp, p->tok.tok));
     if (p->tok.tok == ',') {
@@ -1056,8 +1058,8 @@ static err_t parse_let(struct parser *p) {
   return res;
 }
 
-static err_t parse_return(struct parser *p) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_return(struct parser *p) {
+  val_t res = MJS_TRUE;
   pnext(p);
   // It is either "return;" or "return EXPR;"
   if (p->tok.tok == ';' || p->tok.tok == '}') {
@@ -1070,7 +1072,7 @@ static err_t parse_return(struct parser *p) {
   return res;
 }
 
-static err_t parse_block_or_stmt(struct parser *p, int create_scope) {
+static val_t parse_block_or_stmt(struct parser *p, int create_scope) {
   if (lookahead(p) == '{') {
     return parse_block(p, create_scope);
   } else {
@@ -1078,8 +1080,8 @@ static err_t parse_block_or_stmt(struct parser *p, int create_scope) {
   }
 }
 
-static err_t parse_while(struct parser *p) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_while(struct parser *p) {
+  val_t res = MJS_TRUE;
   struct parser tmp;
   pnext(p);
   EXPECT(p, '(');
@@ -1109,15 +1111,15 @@ static err_t parse_while(struct parser *p) {
   return res;
 }
 
-static err_t parse_statement(struct parser *p) {
+static val_t parse_statement(struct parser *p) {
   switch (p->tok.tok) {
     case ';':
       pnext(p);
-      return MJS_SUCCESS;
+      return MJS_TRUE;
     case TOK_LET:
       return parse_let(p);
     case '{': {
-      err_t res = parse_block(p, 1);
+      val_t res = parse_block(p, 1);
       pnext(p);
       return res;
     }
@@ -1138,7 +1140,7 @@ static err_t parse_statement(struct parser *p) {
       // clang-format on
       return vm_err(p->vm, "[%.*s] not implemented", p->tok.len, p->tok.ptr);
     default: {
-      err_t res = MJS_SUCCESS;
+      val_t res = MJS_TRUE;
       for (;;) {
         TRY(parse_expr(p));
         if (p->tok.tok != ',') break;
@@ -1149,11 +1151,11 @@ static err_t parse_statement(struct parser *p) {
   }
 }
 
-static err_t parse_statement_list(struct parser *p, tok_t endtok) {
-  err_t res = MJS_SUCCESS;
+static val_t parse_statement_list(struct parser *p, tok_t endtok) {
+  val_t res = MJS_TRUE;
   pnext(p);
   LOG((DBGPREFIX "%s: tok %d endtok %d\n", __func__, p->tok.tok, endtok));
-  while (res == MJS_SUCCESS && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
+  while (res != MJS_ERROR && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
     // Drop previous value from the stack
     if (!p->noexec && p->vm->sp > 0) vm_drop(p->vm);
     res = parse_statement(p);
@@ -1180,7 +1182,7 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   struct parser p = mk_parser(vm, buf, len >= 0 ? len : (int) strlen(buf));
   val_t v = MJS_ERROR;
   vm->error_message[0] = '\0';
-  if (parse_statement_list(&p, TOK_EOF) == MJS_SUCCESS && vm->sp == 1) {
+  if (parse_statement_list(&p, TOK_EOF) != MJS_ERROR && vm->sp == 1) {
     v = *vm_top(vm);
   }
   vm_dump(vm);
