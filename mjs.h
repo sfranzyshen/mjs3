@@ -32,12 +32,13 @@ typedef uint32_t mjs_len_t;
 struct mjs *mjs_create(void);            // Create instance
 void mjs_destroy(struct mjs *);          // Destroy instance
 mjs_val_t mjs_get_global(struct mjs *);  // Get global namespace object
-mjs_val_t mjs_eval(struct mjs *mjs, const char *buf, int len);  // Evaluate
-const char *mjs_stringify(struct mjs *, mjs_val_t v);  // Stringify value
-unsigned long mjs_size(void);                          // Get VM size
-
-float mjs_get_number(mjs_val_t v);
-char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
+mjs_val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
+mjs_val_t mjs_set(struct vm *, mjs_val_t obj, mjs_val_t key,
+                  mjs_val_t val);                            // Set attribute
+const char *mjs_stringify(struct mjs *, mjs_val_t v);        // Stringify value
+unsigned long mjs_size(void);                                // Get VM size
+float mjs_get_number(mjs_val_t v);                           // Unpack number
+char *mjs_get_string(struct mjs *, mjs_val_t, mjs_len_t *);  // Unpack string
 
 #if defined(__cplusplus)
 }
@@ -384,7 +385,7 @@ static val_t lookup_and_push(struct vm *vm, const char *ptr, len_t len) {
   return vm_err(mjs, "[%.*s] undefined", len, ptr);
 }
 
-static val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
+val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_TYPE_OBJECT) {
     len_t len;
     const char *ptr = mjs_get_string(vm, key, &len);
