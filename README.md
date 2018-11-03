@@ -23,6 +23,30 @@ mJS is a single-header JavaScript engine for microcontrollers.
 - mJS VM executes JS source directly, no AST/bytecode is generated
 - Simple FFI API to inject existing C functions into JS
 
+## Example - blinky in JavaScript on Arduino Mini
+
+```c++
+#define MJS_STRING_POOL_SIZE 200
+#include "mjs.h"
+
+extern "C" void myDelay(int x) { delay(x); }
+extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
+
+void setup() {
+  struct mjs *mjs = mjs_create();
+  mjs_inject_1(vm, "delay", (mjs_cfunc_t) myDelay, CT_INT);
+  mjs_inject_2(vm, "write", (mjs_cfunc_t) myDigitalWrite, CT_INT, CT_INT);
+  mjs_eval(mjs, "while (1) { write(13, 0); delay(100); write(13, 1); delay(100); }", -1);
+}
+
+void loop() { for(;;); }
+```
+
+```
+Sketch uses 17620 bytes (57%) of program storage space. Maximum is 30720 bytes.
+Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for local variables. Maximum is 2048 bytes.
+```
+
 ## Supported standard operations and constructs
 
 | Name              |  Operation                   |
