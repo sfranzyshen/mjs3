@@ -51,9 +51,9 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ## Supported non-standard JS API
 
-| Function          |  Example | Description                              |
-| ----------------- | -------- | ----------------------------------------- |
-| `s[offset]`       | `'a'[0] === 0x61;` <br> `let x = 0x100[0];` | Return byte value at `offset`. `s` is either a string, or a number, in which case it is interprepted as `uint8_t *` pointer. |
+| Function          |  Description                              |
+| ----------------- | ----------------------------------------- |
+| `s[offset]`       | Return byte value at `offset`. `s` is either a string, or a number, in which case it is interprepted as `uint8_t *` pointer. Example: `'abc'[0]` returns 0x61, `0x100[0];` returns byte at memory address `0x100`. | |
 
 ## C API Reference
 
