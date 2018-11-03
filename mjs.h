@@ -288,6 +288,21 @@ static void vm_dump(const struct vm *vm) {
 ////////////////////////////////////// VM ////////////////////////////////////
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 
+static void abandon(struct vm *vm, val_t v) {
+  if (mjs_type(v) == MJS_TYPE_OBJECT) {
+    ind_t i, obj_index = (ind_t) VAL_PAYLOAD(v);
+    struct obj *o = &vm->objs[obj_index];
+    o->flags = 0;  // Mark object free
+    i = o->props;
+    while (i != INVALID_INDEX) {  // Deallocate obj's properties too
+      struct prop *prop = &vm->props[i];
+      i = prop->next;   // Point to the next property
+      prop->flags = 0;  // Mark property free
+      if (mjs_type(prop->val) == MJS_TYPE_OBJECT) abandon(vm, prop->val);
+    }
+  }
+}
+
 static val_t vm_push(struct vm *vm, val_t v) {
   if (vm->sp < ARRSIZE(vm->data_stack)) {
     LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
@@ -303,6 +318,7 @@ static val_t vm_drop(struct vm *vm) {
   if (vm->sp > 0) {
     LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
     vm->sp--;
+    abandon(vm, vm->data_stack[vm->sp]);
     return MJS_TRUE;
   } else {
     return vm_err(vm, "stack underflow");
@@ -384,22 +400,12 @@ static val_t create_scope(struct vm *vm) {
   return scope;
 }
 
-// Abandon value
-static void s_glaz_doloy_iz_serdca_von(struct vm *vm, val_t v) {
-  if (mjs_type(v) == MJS_TYPE_OBJECT) {
-    ind_t obj_index = (ind_t) VAL_PAYLOAD(v);
-    struct obj *o = &vm->objs[obj_index];
-    o->flags = 0;
-    // TODO(lsm): Deallocate obj's properties too
-  }
-}
-
 static val_t delete_scope(struct vm *vm) {
   if (vm->csp <= 0 || vm->csp >= ARRSIZE(vm->call_stack)) {
     return vm_err(vm, "Corrupt call stack");
   } else {
-    s_glaz_doloy_iz_serdca_von(vm, vm->call_stack[vm->csp - 1]);
     vm->csp--;
+    abandon(vm, vm->call_stack[vm->csp]);
     return MJS_TRUE;
   }
 }
@@ -759,7 +765,7 @@ static val_t do_op(struct parser *p, int op) {
         val_t v = mjs_concat(p->vm, a, b);
         if (v == MJS_ERROR) return v;
         top[-1] = v;
-        p->vm->sp--;
+        vm_drop(p->vm);
         break;
       }
     // Fallthrough
@@ -769,7 +775,7 @@ static val_t do_op(struct parser *p, int op) {
     case '%':
       if (mjs_type(a) == MJS_TYPE_NUMBER && mjs_type(b) == MJS_TYPE_NUMBER) {
         top[-1] = do_arith_op(tof(a), tof(b), op);
-        p->vm->sp--;
+        vm_drop(p->vm);
       } else {
         return vm_err(p->vm, "apples to apples please");
       }
@@ -967,7 +973,7 @@ static val_t call_js_function(struct parser *p, val_t f) {
       TRY(mjs_set(p->vm, scope, key, val));
       pnext(&p2);
     }
-    p->vm->sp--;  // Drop argument value from the data_stack
+    vm_drop(p->vm);  // Drop argument value from the data_stack
     LOG((DBGPREFIX "%s: P sp %d\n", __func__, p->vm->sp));
   }
   while (p2.tok.tok != '{') pnext(&p2);  // Consume any leftover arguments

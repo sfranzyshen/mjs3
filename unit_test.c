@@ -93,10 +93,16 @@ static void test_ffi(void) {
   mjs_destroy(mjs);
 }
 
+static void test_scopes(void) {
+  struct mjs *mjs = mjs_create();
+  mjs_destroy(mjs);
+}
+
 int main(void) {
   test_strings();
   test_expr();
   test_ffi();
+  test_scopes();
   printf("TEST PASSED\n");
   return 0;
 }
