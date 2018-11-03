@@ -27,7 +27,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ```c++
 #define MJS_STRING_POOL_SIZE 200
-#include "mjs.h"
+#include "mjs.h"  // Sketch -> Add File -> mjs.h
 
 extern "C" void myDelay(int x) { delay(x); }
 extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
