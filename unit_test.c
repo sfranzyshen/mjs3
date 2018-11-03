@@ -89,15 +89,14 @@ static void test_ffi(void) {
   assert(numexpr(mjs, "sub(0, 0xff);", -255));
   assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
   assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
-  // printf("%s\n", mjs_stringify(mjs, mjs_eval(mjs, "fmt('%.2f', pi());",
-  // -1))); assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
+  assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
   mjs_destroy(mjs);
 }
 
 int main(void) {
-  test_ffi();
   test_strings();
   test_expr();
+  test_ffi();
   printf("TEST PASSED\n");
   return 0;
 }

@@ -1021,8 +1021,10 @@ static val_t call_c_function(struct parser *p, val_t f) {
             ((float (*)(float, float)) cfunc->fp)(tof(top[-1]), tof(top[0])));
         break;
       case 14:  // 01110: CT_FLOAT, CT_CHAR_PTR, ret CT_CHAR_PTR, nargs 2
-        v = tov(
-            ((float (*)(float, float)) cfunc->fp)(tof(top[-1]), tof(top[0])));
+        v = mk_str(p->vm,
+                   ((char *(*) (char *, float) ) cfunc->fp)(
+                       mjs_to_str(p->vm, top[-1], NULL), tof(top[0])),
+                   -1);
         break;
       default:
         v = vm_err(p->vm, "unsupported FFI");
@@ -1319,7 +1321,7 @@ mjs_val_t mjs_mk_c_func(struct vm *vm, mjs_cfunc_t f, uint8_t num_args,
   cfunc->fp = f;
   cfunc->num_args = num_args;
   cfunc->types[0] = (uint8_t) types[0];
-  for (i = 0; i < num_args; i++) cfunc->types[i + 1] = (uint8_t) types[i];
+  for (i = 0; i < num_args; i++) cfunc->types[i + 1] = (uint8_t) types[i + 1];
   return v;
 }
 
