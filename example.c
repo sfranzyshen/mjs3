@@ -6,17 +6,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static int sub(int a, int b) { return a - b; }
-static int sq(void) { return 42; }
+static float sub(float a, float b) { return a - b; }
+static float sq(void) { return 42; }
 static int print(const char *a) { return printf("%s\n", a); }
 
 int main(int argc, char *argv[]) {
   int i;
   struct mjs *mjs = mjs_create();
   val_t val = MJS_UNDEFINED;
-  mjs_inject_2(mjs, "sub", (mjs_cfunc_t) sub, CT_INT, CT_INT);
-  mjs_inject_1(mjs, "print", (mjs_cfunc_t) print, CT_CHAR_PTR);
-  mjs_inject_0(mjs, "sq", (mjs_cfunc_t) sq);
+  mjs_inject_2(mjs, "sub", (mjs_cfunc_t) sub, CT_FLOAT, CT_FLOAT, CT_FLOAT);
+  mjs_inject_1(mjs, "print", (mjs_cfunc_t) print, CT_FLOAT, CT_CHAR_PTR);
+  mjs_inject_0(mjs, "sq", (mjs_cfunc_t) sq, CT_FLOAT);
   for (i = 1; i < argc && argv[i][0] == '-' && val != MJS_ERROR; i++) {
     if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
       const char *code = argv[++i];

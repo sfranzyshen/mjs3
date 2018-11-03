@@ -24,14 +24,13 @@ typedef unsigned char uint8_t;
 
 #define mjs vm  // Aliasing `struct mjs` to `struct vm`
 
-// Types
-typedef uint32_t mjs_val_t;
-typedef uint32_t mjs_len_t;
+typedef uint32_t mjs_val_t;         // JS value placeholder
+typedef uint32_t mjs_len_t;         // String length placeholder
+typedef void (*mjs_cfunc_t)(void);  // Native C function, for exporting to JS
+typedef enum { CT_FLOAT = 0, CT_CHAR_PTR = 1 } mjs_ctype_t;  // C FFI types
 
-// Create and destroy the VM
-struct mjs *mjs_create(void);    // Create instance
-void mjs_destroy(struct mjs *);  // Destroy instance
-
+struct mjs *mjs_create(void);            // Create instance
+void mjs_destroy(struct mjs *);          // Destroy instance
 mjs_val_t mjs_get_global(struct mjs *);  // Get global namespace object
 mjs_val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
 mjs_val_t mjs_set(struct vm *, mjs_val_t obj, mjs_val_t key,
@@ -47,15 +46,12 @@ mjs_val_t mjs_mk_num(float value);
 mjs_val_t mjs_mk_js_func(struct mjs *, const char *, int len);
 
 // Exporting C function into JS
-typedef void (*mjs_cfunc_t)(void);
-typedef enum { CT_INT, CT_CHAR_PTR } mjs_ctype_t;
-mjs_val_t mjs_mk_c_func(struct mjs *, mjs_cfunc_t, mjs_ctype_t return_type,
-                        int num_args, ...);
-
-// API for implementing native C functions, callable from JS
-mjs_val_t mjs_nargs(struct mjs *);     // Get number of arguments (in a func)
-mjs_val_t mjs_arg(struct mjs *, int);  // Get argument (in a function)
-void mjs_return(struct mjs *, mjs_val_t);  // Return value from a function
+mjs_val_t mjs_inject_0(struct mjs *, const char *name, mjs_cfunc_t f,
+                       mjs_ctype_t rettype);
+mjs_val_t mjs_inject_1(struct mjs *, const char *name, mjs_cfunc_t f,
+                       mjs_ctype_t rettype, mjs_ctype_t t1);
+mjs_val_t mjs_inject_2(struct vm *vm, const char *name, mjs_cfunc_t f,
+                       mjs_ctype_t rettype, mjs_ctype_t t1, mjs_ctype_t t2);
 
 // Converting from mjs_val_t to C/C++ types
 float mjs_to_float(mjs_val_t v);                         // Unpack number
@@ -158,10 +154,9 @@ struct obj {
 #define OBJ_CALL_ARGS 2  // This oject sits in the call stack, holds call args
 
 struct cfunc {
-  void (*fp)(void);  // Pointer to function
-  int num_args;
-  mjs_ctype_t return_type;
-  mjs_ctype_t arg_types[2];
+  mjs_cfunc_t fp;    // Pointer to function
+  uint8_t num_args;  // Number of arguments
+  uint8_t types[3];  // types[0] is a return type, followed by arg types
 };
 
 struct vm {
@@ -984,7 +979,7 @@ static val_t call_js_function(struct parser *p, val_t f) {
 
 static val_t call_c_function(struct parser *p, val_t f) {
   struct cfunc *cfunc = &p->vm->cfuncs[VAL_PAYLOAD(f)];
-  int num_args = 0;
+  uint8_t num_args = 0;
   val_t res = MJS_UNDEFINED;
   while (p->tok.tok != ')') {
     TRY(parse_expr(p));  // Push next arg to the data_stack
@@ -994,29 +989,50 @@ static val_t call_c_function(struct parser *p, val_t f) {
   if (cfunc->num_args != num_args) {
     res = vm_err(p->vm, "expecting %d args", (int) cfunc->num_args);
   } else {
-    val_t *o = vm_top(p->vm);
-    int ret, a = (int) tof(o[0]), b = (int) tof(o[-1]);
-    switch (num_args) {
-      case 0:
-        ret = ((int (*)(void)) cfunc->fp)();
+    val_t *top = vm_top(p->vm), v;
+    uint8_t *t = cfunc->types;
+    int choice = cfunc->num_args | (t[0] << 2) | (t[1] << 3) | (t[2] << 4);
+    LOG((DBGPREFIX "%s: %d\n", __func__, choice));
+    switch (choice) {
+      case 0:  // 000: ret CT_FLOAT, nargs 0
+        v = tov(((float (*)(void)) cfunc->fp)());
         break;
-      case 1:
-        if (cfunc->arg_types[0] == CT_CHAR_PTR) {
-          ret = ((int (*)(char *)) cfunc->fp)(mjs_to_str(p->vm, o[0], NULL));
-        } else {
-          ret = ((int (*)(int)) cfunc->fp)(a);
-        }
+      case 4:  // 100: ret CT_CHAR_PTR, nargs 0
+        v = mk_str(p->vm, ((char *(*) (void) ) cfunc->fp)(), -1);
         break;
-      case 2:
-        ret = ((int (*)(int, int)) cfunc->fp)(b, a);
+      case 1:  // 0001: CT_FLOAT, ret CT_FLOAT, nargs 1
+        v = tov(((float (*)(float)) cfunc->fp)(tof(top[0])));
+        break;
+      case 5:  // 0101: CT_FLOAT, ret CT_CHAR_PTR, nargs 1
+        v = mk_str(p->vm, ((char *(*) (float) ) cfunc->fp)(tof(top[0])), -1);
+        break;
+      case 9:  // 1001: CT_CHAR_PTR, ret CT_FLOAT, nargs 1
+        v = tov(
+            ((float (*)(char *)) cfunc->fp)(mjs_to_str(p->vm, top[0], NULL)));
+        break;
+      case 13:  // 1101: CT_CHAR_PTR, ret CT_CHAR_PTR, nargs 1
+        v = mk_str(
+            p->vm,
+            ((char *(*) (char *) ) cfunc->fp)(mjs_to_str(p->vm, top[0], NULL)),
+            -1);
+        break;
+      case 2:  // 00010: CT_FLOAT, CT_FLOAT, ret CT_FLOAT, nargs 2
+        v = tov(
+            ((float (*)(float, float)) cfunc->fp)(tof(top[-1]), tof(top[0])));
+        break;
+      case 14:  // 01110: CT_FLOAT, CT_CHAR_PTR, ret CT_CHAR_PTR, nargs 2
+        v = tov(
+            ((float (*)(float, float)) cfunc->fp)(tof(top[-1]), tof(top[0])));
         break;
       default:
-        return vm_err(p->vm, "unsupported num_args");
+        v = vm_err(p->vm, "unsupported FFI");
+        break;
     }
-    while (num_args-- > 0) vm_drop(p->vm);   // Abandon pushed args
-    vm_drop(p->vm);                          // Abandon function object
-    res = vm_push(p->vm, tov((float) ret));  // Push call result
+    while (num_args-- > 0) vm_drop(p->vm);  // Abandon pushed args
+    vm_drop(p->vm);                         // Abandon function object
+    res = vm_push(p->vm, v);                // Push call result
   }
+  LOG((DBGPREFIX "%s: %d\n", __func__, p->tok.tok));
   return res;
 }
 
@@ -1293,54 +1309,49 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   return v;
 }
 
-mjs_val_t mjs_mk_c_funcv(struct vm *vm, mjs_cfunc_t f, int num_args,
-                         mjs_ctype_t *types) {
+mjs_val_t mjs_mk_c_func(struct vm *vm, mjs_cfunc_t f, uint8_t num_args,
+                        mjs_ctype_t *types) {
   val_t v = mk_cfunc(vm);
-  int i = 0;
+  uint8_t i = 0;
   struct cfunc *cfunc = &vm->cfuncs[VAL_PAYLOAD(v)];
   if (v == MJS_ERROR) return v;
-  if (num_args >= (int) ARRSIZE(cfunc->arg_types)) return vm_err(vm, "cmon!");
+  if (num_args > (uint8_t) ARRSIZE(cfunc->types)) return vm_err(vm, "cmon!");
   cfunc->fp = f;
   cfunc->num_args = num_args;
-  cfunc->return_type = CT_INT;
-  for (i = 0; i < num_args; i++) cfunc->arg_types[i] = types[i];
+  cfunc->types[0] = (uint8_t) types[0];
+  for (i = 0; i < num_args; i++) cfunc->types[i + 1] = (uint8_t) types[i];
   return v;
 }
 
-// mjs_val_t mjs_mk_c_func(struct vm *vm, mjs_cfunc_t func_ptr,
-//                         mjs_ctype_t return_type, int num_args, ...) {
-//   va_list ap;
-//   val_t v;
-//   va_start(ap, num_args);
-//   v = mjs_mk_c_funcv(mjs, func_ptr, return_type, num_args, ap);
-//   va_end(ap);
-//   return v;
-// }
-
-mjs_val_t mjs_inject(struct vm *vm, const char *p, mjs_cfunc_t f, int nargs,
+mjs_val_t mjs_inject(struct vm *vm, const char *p, mjs_cfunc_t f, uint8_t nargs,
                      mjs_ctype_t *types) {
   return mjs_set(mjs, mjs_get_global(mjs), mjs_mk_str(vm, p, -1),
-                 mjs_mk_c_funcv(vm, f, nargs, types));
+                 mjs_mk_c_func(vm, f, nargs, types));
 }
 
-mjs_val_t mjs_inject_0(struct vm *vm, const char *p, mjs_cfunc_t f) {
+mjs_val_t mjs_inject_0(struct vm *vm, const char *p, mjs_cfunc_t f,
+                       mjs_ctype_t rettype) {
   return mjs_set(mjs, mjs_get_global(mjs), mjs_mk_str(vm, p, -1),
-                 mjs_mk_c_funcv(vm, f, 0, NULL));
+                 mjs_mk_c_func(vm, f, 0, &rettype));
 }
 
 mjs_val_t mjs_inject_1(struct vm *vm, const char *p, mjs_cfunc_t f,
-                       mjs_ctype_t t1) {
+                       mjs_ctype_t rettype, mjs_ctype_t t1) {
+  mjs_ctype_t types[2];
+  types[0] = rettype;
+  types[1] = t1;
   return mjs_set(mjs, mjs_get_global(mjs), mjs_mk_str(vm, p, -1),
-                 mjs_mk_c_funcv(vm, f, 1, &t1));
+                 mjs_mk_c_func(vm, f, 1, types));
 }
 
 mjs_val_t mjs_inject_2(struct vm *vm, const char *p, mjs_cfunc_t f,
-                       mjs_ctype_t t1, mjs_ctype_t t2) {
-  mjs_ctype_t types[2];
-  types[0] = t1;
-  types[1] = t2;
+                       mjs_ctype_t rettype, mjs_ctype_t t1, mjs_ctype_t t2) {
+  mjs_ctype_t types[3];
+  types[0] = rettype;
+  types[1] = t1;
+  types[2] = t2;
   return mjs_set(mjs, mjs_get_global(mjs), mjs_mk_str(vm, p, -1),
-                 mjs_mk_c_funcv(vm, f, 2, types));
+                 mjs_mk_c_func(vm, f, 2, types));
 }
 
 float mjs_to_float(val_t v) { return tof(v); }

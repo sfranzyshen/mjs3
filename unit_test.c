@@ -71,7 +71,31 @@ static void test_strings(void) {
   mjs_destroy(mjs);
 }
 
+static float pi(void) { return 3.1415926f; }          // Return value of PI
+static float sub(float a, float b) { return a - b; }  // Subtract two numbers
+static char *fmt(const char *fmt, float f) {          // Format float value
+  static char buf[20];
+  snprintf(buf, sizeof(buf), fmt, f);
+  return buf;
+}
+
+static void test_ffi(void) {
+  struct mjs *mjs = mjs_create();
+  mjs_inject_0(mjs, "pi", (mjs_cfunc_t) pi, CT_FLOAT);
+  mjs_inject_2(mjs, "sub", (mjs_cfunc_t) sub, CT_FLOAT, CT_FLOAT, CT_FLOAT);
+  mjs_inject_2(mjs, "fmt", (mjs_cfunc_t) fmt, CT_CHAR_PTR, CT_CHAR_PTR,
+               CT_FLOAT);
+  assert(numexpr(mjs, "sub(1,3);", -2));
+  assert(numexpr(mjs, "sub(0, 0xff);", -255));
+  assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
+  assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
+  // printf("%s\n", mjs_stringify(mjs, mjs_eval(mjs, "fmt('%.2f', pi());",
+  // -1))); assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
+  mjs_destroy(mjs);
+}
+
 int main(void) {
+  test_ffi();
   test_strings();
   test_expr();
   printf("TEST PASSED\n");
