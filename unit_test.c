@@ -7,12 +7,12 @@
 
 static int check_num(mjs_val_t v, float expected) {
   return mjs_type(v) == MJS_TYPE_NUMBER &&
-         fabs(mjs_get_number(v) - expected) < 0.0001;
+         fabs(mjs_to_float(v) - expected) < 0.0001;
 }
 
 static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
   mjs_len_t len;
-  const char *p = mjs_get_string(mjs, v, &len);
+  const char *p = mjs_to_str(mjs, v, &len);
   return mjs_type(v) == MJS_TYPE_STRING && len == strlen(expected) &&
          memcmp(p, expected, len) == 0;
 }
