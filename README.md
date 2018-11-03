@@ -53,7 +53,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 | Function          |  Example | Description                              |
 | ----------------- | -------- | ----------------------------------------- |
-| `s[offset]`       | 'a'[0] === 0x61; <br> let x = 0x100[0]; | Return byte value at `offset`. `s` is either a string, or a number, in which case it is interprepted as `uint8_t *` pointer. |
+| `s[offset]`       | `'a'[0] === 0x61;` <br> `let x = 0x100[0];` | Return byte value at `offset`. `s` is either a string, or a number, in which case it is interprepted as `uint8_t *` pointer. |
 
 ## C API Reference
 
