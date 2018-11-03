@@ -27,7 +27,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 | Name              |  Operation                   |
 | ----------------- | ---------------------------- |
-| Operations        | All but `!=`, `==`. Use `!==`, `===` |
+| Operations        | All but `!=`, `==`. Use `!==`, `===` instead |
 | typeof            | `typeof(...)`                |
 | delete            | `delete obj.k`               |
 | for, while, for..in  | `for (let k in obj) { ... }`, `while (...) {...}`, `for (...) { ... }` |
@@ -37,8 +37,6 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
 | Arrays            | `let arr = [1, 2, 'hi there']` |
 
-
-## Supported non-standard operations
 
 ## Unsupported standard operations and constructs
 
@@ -51,7 +49,11 @@ mJS is a single-header JavaScript engine for microcontrollers.
 | Standard types    | No `Date`, `ReGexp`, `Function`, `String`, `Number` |
 | Prototypes        | No prototype based inheritance |
 
-## JS API Reference
+## Supported non-standard JS API
+
+| Function          |  Example | Description                              |
+| ----------------- | -------- | ----------------------------------------- |
+| `s[offset]`       | 'a'[0] === 0x61; <br> let x = 0x100[0]; | Return byte value at `offset`. `s` is either a string, or a number, in which case it is interprepted as `uint8_t *` pointer. |
 
 ## C API Reference
 
