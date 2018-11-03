@@ -66,7 +66,7 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
-| do...while, switch| `do { ... } while (...);` `switch (...) {...}` |
+| do...while, switch| `do { ... } while (...)`, `switch (...) {...}` |
 | Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | var               | `var ...`  (note: use `let ...`) |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
