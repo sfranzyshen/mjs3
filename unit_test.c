@@ -95,6 +95,14 @@ static void test_ffi(void) {
 
 static void test_scopes(void) {
   struct mjs *mjs = mjs_create();
+  assert(numexpr(mjs, "1.23", 1.23f));
+  assert(mjs->csp == 1);
+  assert(mjs->objs[0].flags & OBJ_ALLOCATED);
+  assert(!(mjs->objs[1].flags & OBJ_ALLOCATED));
+  assert(!(mjs->props[0].flags & PROP_ALLOCATED));
+  assert(numexpr(mjs, "{let a = 1.23;}", 1.23f));
+  assert(!(mjs->objs[1].flags & OBJ_ALLOCATED));
+  assert(!(mjs->props[0].flags & PROP_ALLOCATED));
   mjs_destroy(mjs);
 }
 

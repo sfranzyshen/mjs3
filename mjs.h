@@ -429,7 +429,7 @@ static val_t *findprop(struct vm *vm, val_t obj, const char *ptr, len_t len) {
   return NULL;
 }
 
-// Lookup variable and push its value on stack on success
+// Lookup variable
 static val_t *lookup(struct vm *vm, const char *ptr, len_t len) {
   ind_t i;
   for (i = vm->csp; i > 0; i--) {
