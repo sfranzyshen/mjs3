@@ -64,10 +64,21 @@ static void test_expr(void) {
 
 static void test_strings(void) {
   struct mjs *mjs = mjs_create();
+  assert(strexpr(mjs, "'a'", "a"));
+  assert(mjs->stringbuf_len == 3);
+  assert(strexpr(mjs, "'b'", "b"));
+  assert(mjs->stringbuf_len == 3);
+  assert(numexpr(mjs, "1", 1.0f));
+  assert(mjs->stringbuf_len == 0);
+  assert(numexpr(mjs, "{let a = 1;}", 1.0f));
+  assert(mjs->stringbuf_len == 0);
+  assert(numexpr(mjs, "{let a = 'abc';} 1;", 1.0f));
+  assert(mjs->stringbuf_len == 0);
   assert(strexpr(mjs, "'a' + 'b'", "ab"));
   assert(strexpr(mjs, "'vb'", "vb"));
   assert(strexpr(mjs, "let a, b = function(x){}, c = 'aa'", "aa"));
   assert(strexpr(mjs, "let a2, b2 = function(){}, cv = 'aa'", "aa"));
+  // printf("--> %d\n", (int) mjs->stringbuf_len);
   mjs_destroy(mjs);
 }
 

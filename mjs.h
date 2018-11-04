@@ -169,7 +169,7 @@ struct vm {
   struct prop props[MJS_PROP_POOL_SIZE];  // Props pool
   struct cfunc cfuncs[MJS_CFUNC_POOL_SIZE];  // C functions pool
   uint8_t stringbuf[MJS_STRING_POOL_SIZE];   // String pool
-  ind_t sblen;                               // String pool current length
+  ind_t stringbuf_len;                       // String pool current length
 };
 
 #define ARRSIZE(x) ((sizeof(x) / sizeof((x)[0])))
@@ -264,12 +264,12 @@ static void vm_dump(const struct vm *vm) {
   ind_t i;
   printf("[VM] %8s: ", "objs");
   for (i = 0; i < ARRSIZE(vm->objs); i++) {
-    putchar(vm->objs[i].flags & OBJ_ALLOCATED ? 'v' : '-');
+    putchar(vm->objs[i].flags ? 'v' : '-');
   }
   putchar('\n');
   printf("[VM] %8s: ", "props");
   for (i = 0; i < ARRSIZE(vm->props); i++) {
-    putchar(vm->props[i].flags & PROP_ALLOCATED ? 'v' : '-');
+    putchar(vm->props[i].flags ? 'v' : '-');
   }
   putchar('\n');
   printf("[VM] %8s: ", "cfuncs");
@@ -277,9 +277,9 @@ static void vm_dump(const struct vm *vm) {
     putchar(vm->cfuncs[i].fp ? 'v' : '-');
   }
   putchar('\n');
-  printf("[VM] %8s: %d/%d\n", "strings", vm->sblen,
+  printf("[VM] %8s: %d/%d\n", "strings", vm->stringbuf_len,
          (int) sizeof(vm->stringbuf));
-  printf("[VM]  sp %d, csp %d, sb %d\n", vm->sp, vm->csp, vm->sblen);
+  printf("[VM]  sp %d, csp %d, sb %d\n", vm->sp, vm->csp, vm->stringbuf_len);
 }
 #else
 #define vm_dump(x)
@@ -289,16 +289,57 @@ static void vm_dump(const struct vm *vm) {
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 
 static void abandon(struct vm *vm, val_t v) {
-  if (mjs_type(v) == MJS_TYPE_OBJECT) {
+  mjs_type_t t = mjs_type(v);
+  LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
+  // vm_dump(vm);
+  if (t == MJS_TYPE_OBJECT) {
     ind_t i, obj_index = (ind_t) VAL_PAYLOAD(v);
     struct obj *o = &vm->objs[obj_index];
     o->flags = 0;  // Mark object free
     i = o->props;
     while (i != INVALID_INDEX) {  // Deallocate obj's properties too
       struct prop *prop = &vm->props[i];
-      i = prop->next;   // Point to the next property
       prop->flags = 0;  // Mark property free
-      if (mjs_type(prop->val) == MJS_TYPE_OBJECT) abandon(vm, prop->val);
+      assert(mjs_type(prop->key) == MJS_TYPE_STRING);
+      abandon(vm, prop->key);
+      abandon(vm, prop->val);
+      i = prop->next;  // Point to the next property
+    }
+  } else if (t == MJS_TYPE_STRING) {
+    ind_t k, j, i = (ind_t) VAL_PAYLOAD(v);    // String begin
+    ind_t len = (ind_t) vm->stringbuf[i] + 2;  // String length
+
+    // If this string is still referenced, do nothing
+    for (j = 0; j < ARRSIZE(vm->props); j++) {
+      struct prop *prop = &vm->props[j];
+      if (prop->flags == 0) continue;
+      if (v == prop->key || v == prop->val) return;
+    }
+    // Look at the data stack too
+    for (j = 0; j < vm->sp; j++)
+      if (v == vm->data_stack[j]) return;
+
+    // Ok, not referenced, deallocate a string
+    if (i + len == sizeof(vm->stringbuf) || i + len == vm->stringbuf_len) {
+      vm->stringbuf[i] = 0;   // If we're the last string,
+      vm->stringbuf_len = i;  // shrink the buf immediately
+    } else {
+      vm->stringbuf[i + len - 1] = 'x';  // Mark string as dead
+      // Relocate all live strings to the beginning of the buffer
+      // printf("--> RELOC, %hu %hu\n", vm->stringbuf_len, len);
+      memmove(&vm->stringbuf[i], &vm->stringbuf[i + len], len);
+      assert(vm->stringbuf_len >= len);
+      vm->stringbuf_len -= len;
+      for (j = 0; j < ARRSIZE(vm->props); j++) {
+        struct prop *prop = &vm->props[j];
+        if (prop->flags != 0) continue;
+        k = (ind_t) VAL_PAYLOAD(prop->key);
+        if (k > i) prop->key = MK_VAL(MJS_TYPE_STRING, k - len);
+        if (mjs_type(prop->val) == MJS_TYPE_STRING) {
+          k = (ind_t) VAL_PAYLOAD(prop->val);
+          if (k > i) prop->key = MK_VAL(MJS_TYPE_STRING, k - len);
+        }
+      }
     }
   }
 }
@@ -329,14 +370,14 @@ static val_t mk_str(struct vm *vm, const char *p, int n) {
   len_t len = n < 0 ? (len_t) strlen(p) : (len_t) n;
   if (len > 0xff) {
     return vm_err(vm, "string is too long");
-  } else if (len + 2 > sizeof(vm->stringbuf) - vm->sblen) {
+  } else if (len + 2 > sizeof(vm->stringbuf) - vm->stringbuf_len) {
     return vm_err(vm, "string OOM");
   } else {
-    val_t v = MK_VAL(MJS_TYPE_STRING, vm->sblen);
-    vm->stringbuf[vm->sblen++] = (uint8_t)(len & 0xff);  // save length
-    if (p) memmove(&vm->stringbuf[vm->sblen], p, len);   // copy data
-    vm->sblen += (ind_t) len;
-    vm->stringbuf[vm->sblen++] = 0;  // nul-terminate
+    val_t v = MK_VAL(MJS_TYPE_STRING, vm->stringbuf_len);
+    vm->stringbuf[vm->stringbuf_len++] = (uint8_t)(len & 0xff);  // save length
+    if (p) memmove(&vm->stringbuf[vm->stringbuf_len], p, len);   // copy data
+    vm->stringbuf_len += (ind_t) len;
+    vm->stringbuf[vm->stringbuf_len++] = 0;  // nul-terminate
     return v;
   }
 }
@@ -372,7 +413,7 @@ static val_t mk_obj(struct vm *vm) {
   ind_t i;
   // Start iterating from 1, because object 0 is always a global object
   for (i = 1; i < ARRSIZE(vm->objs); i++) {
-    if (vm->objs[i].flags & OBJ_ALLOCATED) continue;
+    if (vm->objs[i].flags != 0) continue;
     vm->objs[i].flags = OBJ_ALLOCATED;
     vm->objs[i].props = INVALID_INDEX;
     return MK_VAL(MJS_TYPE_OBJECT, i);
@@ -395,6 +436,7 @@ static val_t create_scope(struct vm *vm) {
     return vm_err(vm, "Call stack OOM");
   }
   if ((scope = mk_obj(vm)) == MJS_ERROR) return MJS_ERROR;
+  LOG((DBGPREFIX "%s\n", __func__));
   vm->call_stack[vm->csp] = scope;
   vm->csp++;
   return scope;
@@ -404,6 +446,7 @@ static val_t delete_scope(struct vm *vm) {
   if (vm->csp <= 0 || vm->csp >= ARRSIZE(vm->call_stack)) {
     return vm_err(vm, "Corrupt call stack");
   } else {
+    LOG((DBGPREFIX "%s\n", __func__));
     vm->csp--;
     abandon(vm, vm->call_stack[vm->csp]);
     return MJS_TRUE;
@@ -463,14 +506,13 @@ val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
       }
       for (i = 0; i < ARRSIZE(vm->props); i++) {
         struct prop *p = &vm->props[i];
-        if (p->flags & PROP_ALLOCATED) continue;
+        if (p->flags != 0) continue;
         p->flags = PROP_ALLOCATED;
         p->next = o->props;  // Link to the current
         o->props = i;        // props list
         p->key = key;
         p->val = val;
-        LOG((DBGPREFIX "%s: %s: ", __func__, tostr(vm, obj)));
-        LOG(("%s -> ", tostr(vm, key)));
+        LOG((DBGPREFIX "%s: prop %hu %s -> ", __func__, i, tostr(vm, key)));
         LOG(("%s\n", tostr(vm, val)));
         return MJS_TRUE;
       }
@@ -1175,7 +1217,7 @@ static val_t parse_let(struct parser *p) {
     key = mk_str(p->vm, tmp.ptr, tmp.len);
     TRY(key);
     TRY(mjs_set(p->vm, obj, key, val));
-    LOG((DBGPREFIX "%s: sp %d, %d\n", __func__, p->vm->sp, p->tok.tok));
+    // LOG((DBGPREFIX "%s: sp %d, %d\n", __func__, p->vm->sp, p->tok.tok));
     if (p->tok.tok == ',') {
       TRY(vm_drop(p->vm));
       pnext(p);
@@ -1231,7 +1273,7 @@ static val_t parse_while(struct parser *p) {
     LOG((DBGPREFIX "%s: done.., sp %d\n", __func__, p->vm->sp));
     if (p->noexec) break;
     vm_drop(p->vm);
-    vm_dump(p->vm);
+    // vm_dump(p->vm);
   }
   LOG((DBGPREFIX "%s: out.., sp %d\n", __func__, p->vm->sp));
   p->noexec = tmp.noexec;
