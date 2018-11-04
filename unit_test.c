@@ -117,7 +117,19 @@ static void test_scopes(void) {
   mjs_destroy(mjs);
 }
 
+static void test_if(void) {
+  struct mjs *mjs = mjs_create();
+  // printf("---> %s\n", mjs_stringify(mjs, mjs_eval(mjs, "if (true) 1", -1)));
+  assert(numexpr(mjs, "if (true) 1;", 1.0f));
+  assert(numexpr(mjs, "if (0) 1;", 0.0f));
+  assert(mjs_eval(mjs, "if (false) 1.23", -1) == MJS_FALSE);
+  assert(mjs_eval(mjs, "if (null) 1.23", -1) == MJS_NULL);
+  assert(mjs_eval(mjs, "if (undefined) 1.23", -1) == MJS_UNDEFINED);
+  mjs_destroy(mjs);
+}
+
 int main(void) {
+  test_if();
   test_strings();
   test_expr();
   test_ffi();

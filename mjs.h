@@ -969,6 +969,18 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
     case TOK_FUNCTION:
       res = parse_function(p);
       break;
+    case TOK_TRUE:
+      res = vm_push(p->vm, MJS_TRUE);
+      break;
+    case TOK_FALSE:
+      res = vm_push(p->vm, MJS_FALSE);
+      break;
+    case TOK_NULL:
+      res = vm_push(p->vm, MJS_NULL);
+      break;
+    case TOK_UNDEFINED:
+      res = vm_push(p->vm, MJS_UNDEFINED);
+      break;
     case '(':
       pnext(p);
       res = parse_expr(p);
@@ -1280,6 +1292,25 @@ static val_t parse_while(struct parser *p) {
   return res;
 }
 
+static val_t parse_if(struct parser *p) {
+  val_t res = MJS_TRUE;
+  int saved_noexec = p->noexec;
+  pnext(p);
+  EXPECT(p, '(');
+  pnext(p);
+  TRY(parse_expr(p));
+  EXPECT(p, ')');
+  pnext(p);
+  if (is_true(p->vm, *vm_top(p->vm))) {
+    if (!p->noexec) vm_drop(p->vm);
+  } else {
+    p->noexec++;
+  }
+  TRY(parse_block_or_stmt(p, 1));
+  p->noexec = saved_noexec;
+  return res;
+}
+
 static val_t parse_statement(struct parser *p) {
   switch (p->tok.tok) {
     case ';':
@@ -1301,8 +1332,8 @@ static val_t parse_statement(struct parser *p) {
     case TOK_FOR: return parse_for(p);
     case TOK_BREAK: pnext1(p); return MJS_SUCCESS;
     case TOK_CONTINUE: pnext1(p); return MJS_SUCCESS;
-    case TOK_IF: return parse_if(p);
 #endif
+    case TOK_IF: return parse_if(p);
     case TOK_CASE: case TOK_CATCH: case TOK_DELETE: case TOK_DO:
     case TOK_INSTANCEOF: case TOK_NEW: case TOK_SWITCH: case TOK_THROW:
     case TOK_TRY: case TOK_VAR: case TOK_VOID: case TOK_WITH:
