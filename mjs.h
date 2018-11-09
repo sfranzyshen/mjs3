@@ -765,34 +765,42 @@ static struct parser mk_parser(struct vm *vm, const char *buf, int len) {
 }
 
 // clang-format off
-static int s_assign_ops[] = {
+static tok_t s_assign_ops[] = {
   '=', DT('+', '='), DT('-', '='),  DT('*', '='), DT('/', '='), DT('%', '='),
   TT('<', '<', '='), TT('>', '>', '='), QT('>', '>', '>', '='), DT('&', '='),
   DT('^', '='), DT('|', '='), TOK_EOF
 };
 // clang-format on
-static int s_postfix_ops[] = {DT('+', '+'), DT('-', '-'), TOK_EOF};
-static int s_unary_ops[] = {'!',        '~', DT('+', '+'), DT('-', '-'),
-                            TOK_TYPEOF, '-', '+',          TOK_EOF};
+static tok_t s_postfix_ops[] = {DT('+', '+'), DT('-', '-'), TOK_EOF};
+static tok_t s_unary_ops[] = {'!',        '~', DT('+', '+'), DT('-', '-'),
+                              TOK_TYPEOF, '-', '+',          TOK_EOF};
+static tok_t s_equality_ops[] = {DT('=', '+'), DT('!', '='), TT('=', '=', '='),
+                                 TT('=', '=', '='), TOK_EOF};
+static tok_t s_cmp_ops[] = {DT('<', '='), '<', '>', DT('>', '='), TOK_EOF};
 
-static int findtok(const int *toks, int tok) {
+static tok_t findtok(const tok_t *toks, tok_t tok) {
   int i = 0;
   while (tok != toks[i] && toks[i] != TOK_EOF) i++;
   return toks[i];
 }
 
-static val_t do_arith_op(float f1, float f2, int op) {
-  float res = 0;
+static float do_arith_op(float f1, float f2, int op) {
   // clang-format off
   switch (op) {
-    case '+': res = f1 + f2; break;
-    case '-': res = f1 - f2; break;
-    case '*': res = f1 * f2; break;
-    case '/': res = f1 / f2; break;
-    case '%': res = (float) ((val_t) f1 % (val_t) f2); break;
+    case '+': return f1 + f2;
+    case '-': return f1 - f2;
+    case '*': return f1 * f2;
+    case '/': return f1 / f2;
+    case '%': return (float) ((long) f1 % (long) f2);
+    case '^': return (float) ((val_t) f1 ^ (val_t) f2);
+    case '|': return (float) ((val_t) f1 | (val_t) f2);
+    case '&': return (float) ((val_t) f1 & (val_t) f2);
+    case DT('>','>'): return (float) ((long) f1 >> (long) f2);
+    case DT('<','<'): return (float) ((long) f1 << (long) f2);
+    case TT('>','>', '>'): return (float) ((val_t) f1 >> (val_t) f2);
   }
   // clang-format on
-  return tov(res);
+  return 0;
 }
 
 static val_t do_op(struct parser *p, int op) {
@@ -810,13 +818,12 @@ static val_t do_op(struct parser *p, int op) {
         vm_drop(p->vm);
         break;
       }
-    // Fallthrough
-    case '-':
-    case '*':
-    case '/':
-    case '%':
+    // clang-format off
+    case '-': case '*': case '/': case '%': case '^': case '&': case '|':
+    case DT('>', '>'): case DT('<', '<'): case TT('>', '>', '>'):
+      // clang-format on
       if (mjs_type(a) == MJS_TYPE_NUMBER && mjs_type(b) == MJS_TYPE_NUMBER) {
-        top[-1] = do_arith_op(tof(a), tof(b), op);
+        top[-1] = tov(do_arith_op(tof(a), tof(b), op));
         vm_drop(p->vm);
       } else {
         return vm_err(p->vm, "apples to apples please");
@@ -848,7 +855,7 @@ static val_t do_op(struct parser *p, int op) {
 typedef val_t bpf_t(struct parser *p, int prev_op);
 
 static val_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
-                             const int *ops, int prev_op) {
+                             const tok_t *ops, tok_t prev_op) {
   val_t res = MJS_TRUE;
   TRY(f1(p, TOK_EOF));
   if (prev_op != TOK_EOF) TRY(do_op(p, prev_op));
@@ -861,7 +868,7 @@ static val_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
 }
 
 static val_t parse_rtl_binop(struct parser *p, bpf_t f1, bpf_t f2,
-                             const int *ops, int prev_op) {
+                             const tok_t *ops, tok_t prev_op) {
   val_t res = MJS_TRUE;
   (void) prev_op;
   TRY(f1(p, TOK_EOF));
@@ -1177,18 +1184,57 @@ static val_t parse_unary(struct parser *p, int prev_op) {
 }
 
 static val_t parse_mul_div_rem(struct parser *p, int prev_op) {
-  int ops[] = {'*', '/', '%', TOK_EOF};
+  tok_t ops[] = {'*', '/', '%', TOK_EOF};
   return parse_ltr_binop(p, parse_unary, parse_mul_div_rem, ops, prev_op);
 }
 
 static val_t parse_plus_minus(struct parser *p, int prev_op) {
-  int ops[] = {'+', '-', TOK_EOF};
+  tok_t ops[] = {'+', '-', TOK_EOF};
   return parse_ltr_binop(p, parse_mul_div_rem, parse_plus_minus, ops, prev_op);
+}
+
+static val_t parse_shifts(struct parser *p, int prev_op) {
+  tok_t ops[] = {DT('<', '<'), DT('>', '>'), TT('>', '>', '>'), TOK_EOF};
+  return parse_ltr_binop(p, parse_plus_minus, parse_shifts, ops, prev_op);
+}
+
+static val_t parse_comparison(struct parser *p, int prev_op) {
+  return parse_ltr_binop(p, parse_shifts, parse_comparison, s_cmp_ops, prev_op);
+}
+
+static val_t parse_equality(struct parser *p, int prev_op) {
+  return parse_ltr_binop(p, parse_comparison, parse_equality, s_equality_ops,
+                         prev_op);
+}
+
+static val_t parse_bitwise_and(struct parser *p, int prev_op) {
+  tok_t ops[] = {'&', TOK_EOF};
+  return parse_ltr_binop(p, parse_equality, parse_bitwise_and, ops, prev_op);
+}
+
+static val_t parse_bitwise_xor(struct parser *p, int prev_op) {
+  tok_t ops[] = {'^', TOK_EOF};
+  return parse_ltr_binop(p, parse_bitwise_and, parse_bitwise_xor, ops, prev_op);
+}
+
+static val_t parse_bitwise_or(struct parser *p, int prev_op) {
+  tok_t ops[] = {'|', TOK_EOF};
+  return parse_ltr_binop(p, parse_bitwise_xor, parse_bitwise_or, ops, prev_op);
+}
+
+static val_t parse_logical_and(struct parser *p, int prev_op) {
+  tok_t ops[] = {DT('&', '&'), TOK_EOF};
+  return parse_ltr_binop(p, parse_bitwise_or, parse_logical_and, ops, prev_op);
+}
+
+static val_t parse_logical_or(struct parser *p, int prev_op) {
+  tok_t ops[] = {DT('|', '|'), TOK_EOF};
+  return parse_ltr_binop(p, parse_logical_and, parse_logical_or, ops, prev_op);
 }
 
 static val_t parse_ternary(struct parser *p, int prev_op) {
   val_t res = MJS_TRUE;
-  TRY(parse_plus_minus(p, TOK_EOF));
+  TRY(parse_logical_or(p, TOK_EOF));
   if (prev_op != TOK_EOF) do_op(p, prev_op);
   if (p->tok.tok == '?') {
     pnext(p);
