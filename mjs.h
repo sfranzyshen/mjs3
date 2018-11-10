@@ -490,6 +490,12 @@ static val_t lookup_and_push(struct vm *vm, const char *ptr, len_t len) {
   return vm_err(mjs, "[%.*s] undefined", len, ptr);
 }
 
+// static val_t *vm_get(struct vm *vm, val_t obj, val_t key) {
+//   len_t len;
+//   char *ptr = mjs_to_str(vm, key, &len);
+//   return findprop(vm, obj, ptr, len);
+// }
+
 val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_TYPE_OBJECT) {
     len_t len;
@@ -784,7 +790,7 @@ static tok_t findtok(const tok_t *toks, tok_t tok) {
   return toks[i];
 }
 
-static float do_arith_op(float f1, float f2, int op) {
+static float do_arith_op(float f1, float f2, val_t op) {
   // clang-format off
   switch (op) {
     case '+': return f1 + f2;
@@ -801,6 +807,17 @@ static float do_arith_op(float f1, float f2, int op) {
   }
   // clang-format on
   return 0;
+}
+
+static val_t do_assign_op(struct vm *vm, tok_t op) {
+  val_t *t = vm_top(vm);
+  struct prop *prop = &vm->props[(ind_t) tof(t[-1])];
+  if (mjs_type(prop->val) != MJS_TYPE_NUMBER ||
+      mjs_type(t[0]) != MJS_TYPE_NUMBER)
+    return vm_err(vm, "please no");
+  t[-1] = prop->val = tov(do_arith_op(tof(prop->val), tof(t[0]), op));
+  vm_drop(vm);
+  return prop->val;
 }
 
 static val_t do_op(struct parser *p, int op) {
@@ -829,15 +846,44 @@ static val_t do_op(struct parser *p, int op) {
         return vm_err(p->vm, "apples to apples please");
       }
       break;
+    /* clang-format off */
+    case DT('-', '='):      return do_assign_op(p->vm, '-');
+    case DT('+', '='):      return do_assign_op(p->vm, '+');
+    case DT('*', '='):      return do_assign_op(p->vm, '*');
+    case DT('/', '='):      return do_assign_op(p->vm, '/');
+    case DT('%', '='):      return do_assign_op(p->vm, '%');
+    case DT('&', '='):      return do_assign_op(p->vm, '&');
+    case DT('|', '='):      return do_assign_op(p->vm, '|');
+    case DT('^', '='):      return do_assign_op(p->vm, '^');
+    case TT('<', '<', '='): return do_assign_op(p->vm, DT('<', '<'));
+    case TT('>', '>', '='): return do_assign_op(p->vm, DT('>', '>'));
+    case QT('>', '>', '>', '='):  return do_assign_op(p->vm, TT('>', '>', '>'));
+    case ',': break;
+    /* clang-format on */
     case TOK_POSTFIX_MINUS:
     case TOK_POSTFIX_PLUS: {
       struct prop *prop = &p->vm->props[(ind_t) tof(b)];
       if (mjs_type(prop->val) != MJS_TYPE_NUMBER)
         return vm_err(p->vm, "please no");
-      top[0] = prop->val =
-          tov(tof(prop->val) + ((op == TOK_POSTFIX_PLUS) ? 1 : -1));
+      top[0] = prop->val;
+      prop->val = tov(tof(prop->val) + ((op == TOK_POSTFIX_PLUS) ? 1 : -1));
       break;
     }
+    case '!':
+      top[0] = is_true(p->vm, top[0]) ? MJS_FALSE : MJS_TRUE;
+      break;
+    case '~':
+      if (mjs_type(top[0]) != MJS_TYPE_NUMBER) return vm_err(p->vm, "noo");
+      top[0] = tov(~(long) tof(top[0]));
+      break;
+    case TOK_UNARY_PLUS:
+      break;
+    case TOK_UNARY_MINUS:
+      top[0] = tov(-tof(top[0]));
+      break;
+      // static tok_t s_unary_ops[] = {'!',        '~', DT('+', '+'), DT('-',
+      // '-'),
+      //                              TOK_TYPEOF, '-', '+',          TOK_EOF};
     case '=': {
       val_t obj = p->vm->call_stack[p->vm->csp - 1];
       val_t res = mjs_set(p->vm, obj, a, b);

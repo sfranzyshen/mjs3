@@ -56,11 +56,14 @@ static void test_expr(void) {
   assert(numexpr(mjs, "2 * (1 + 2)", 6.0f));
   assert(numexpr(mjs, "let at = 9; while (at) at--;", 0.0f));
   assert(numexpr(mjs, "let a2 = 9, b2 = 0; while (a2) { a2--; } ", 0.0f));
-  assert(numexpr(mjs, "let a3 = 9, b3 = 0; while (a3) a3--; b3++; ", 1.0f));
+  assert(numexpr(mjs, "let a3 = 9, b3 = 0; while (a3) a3--; b3++; ", 0.0f));
+  assert(numexpr(mjs, "b3", 1.0f));
   assert(numexpr(mjs, "let a4 = 9, b4 = 7; while (a4){a4--;b4++;} b4", 16.0f));
 
-  assert(numexpr(mjs, "let q = 1; q++;", 2.0f));
-  assert(numexpr(mjs, "q--;", 1.0f));
+  assert(numexpr(mjs, "let q = 1; q++;", 1.0f));
+  assert(numexpr(mjs, "q;", 2.0f));
+  assert(numexpr(mjs, "q--;", 2.0f));
+  assert(numexpr(mjs, "q;", 1.0f));
 
   assert(numexpr(mjs, "0x64", 100));
   assert(numexpr(mjs, "0x7fffffff", 0x7fffffff));
@@ -89,23 +92,26 @@ static void test_expr(void) {
   assert(numexpr(mjs, "0.1 + 0.2", 0.3));
   assert(numexpr(mjs, "123.4 + 0.1", 123.5));
 
-  // // /* test operation+assignment */
-  // CHECK_NUMERIC("let a = 200; a += 50; a", 250);
-  // CHECK_NUMERIC("let a = 200; a -= 50; a", 150);
-  // CHECK_NUMERIC("let a = 200; a *= 50; a", 10000);
-  // CHECK_NUMERIC("let a = 200; a /= 50; a", 4);
-  // CHECK_NUMERIC("let a = 200; a %= 21; a", 11);
-  // CHECK_NUMERIC("let a = 100; a <<= 3; a", 800);
-  // CHECK_NUMERIC("let a = 0-14; a >>= 2; a", -4);
-  // CHECK_NUMERIC("let a = 0-14; a >>>= 2; a", 1073741820);
-  // CHECK_NUMERIC("let a = 6; a &= 3; a", 2);
-  // CHECK_NUMERIC("let a = 6; a |= 3; a", 7);
-  // CHECK_NUMERIC("let a = 6; a ^= 3; a", 5);
+  // printf("--> %s\n", mjs_stringify(mjs, mjs_eval(mjs, "~10", -1)));
+  assert(numexpr(mjs, "{let a = 200; a += 50; a}", 250));
+  assert(numexpr(mjs, "{let a = 200; a -= 50; a}", 150));
+  assert(numexpr(mjs, "{let a = 200; a *= 50; a}", 10000));
+  assert(numexpr(mjs, "{let a = 200; a /= 50; a}", 4));
+  assert(numexpr(mjs, "{let a = 200; a %= 21; a}", 11));
+  assert(numexpr(mjs, "{let a = 100; a <<= 3; a}", 800));
+  assert(numexpr(mjs, "{let a = 0-14; a >>= 2; a}", -4));
+  assert(numexpr(mjs, "{let a = 0-14; a >>>= 2; a}", 1073741820));
+  assert(numexpr(mjs, "{let a = 6; a &= 3; a}", 2));
+  assert(numexpr(mjs, "{let a = 6; a |= 3; a}", 7));
+  assert(numexpr(mjs, "{let a = 6; a ^= 3; a}", 5));
 
-  // // /* unary ops */
-  // CHECK_NUMERIC("~10", -11);
-  // CHECK_NUMERIC("-100", -100);
-  // CHECK_NUMERIC("+100", 100);
+  assert(mjs_eval(mjs, "!0", -1) == MJS_TRUE);
+  assert(mjs_eval(mjs, "!1", -1) == MJS_FALSE);
+  assert(mjs_eval(mjs, "!''", -1) == MJS_TRUE);
+  assert(mjs_eval(mjs, "!false", -1) == MJS_TRUE);
+  assert(numexpr(mjs, "~10", -11));
+  assert(numexpr(mjs, "-100", -100));
+  assert(numexpr(mjs, "+100", 100));
 
   // ASSERT_EXEC_OK(mjs_exec(mjs, "NaN", &res));
   // ASSERT_EQ(!!isnan(mjs_get_double(mjs, res)), 1);
