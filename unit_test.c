@@ -113,6 +113,8 @@ static void test_expr(void) {
   assert(numexpr(mjs, "-100", -100));
   assert(numexpr(mjs, "+100", 100));
 
+  assert(numexpr(mjs, "2 * (3 + 4)", 14));
+
   // ASSERT_EXEC_OK(mjs_exec(mjs, "NaN", &res));
   // ASSERT_EQ(!!isnan(mjs_get_double(mjs, res)), 1);
 
