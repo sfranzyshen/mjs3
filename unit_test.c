@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define CHECK_NUMERIC(x, y) assert(numexpr(mjs, (x), (y)))
+
 static int check_num(mjs_val_t v, float expected) {
   return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_to_float(v) - expected) < 0.0001;
@@ -212,6 +214,11 @@ static void test_scopes(void) {
   assert(numexpr(mjs, "{let a = 1.23;}", 1.23f));
   assert(!(mjs->objs[1].flags & OBJ_ALLOCATED));
   assert(!(mjs->props[0].flags & PROP_ALLOCATED));
+  CHECK_NUMERIC("if (1) 2", 2);
+  assert(mjs_eval(mjs, "if (0) 2;", -1) == MJS_UNDEFINED);
+  CHECK_NUMERIC("{let a = 42; }", 42);
+  CHECK_NUMERIC("let a = 1, b = 2; { let a = 3; b += a; } b;", 5);
+  assert(mjs_eval(mjs, "{}", -1) == MJS_UNDEFINED);
   mjs_destroy(mjs);
 }
 
@@ -219,10 +226,11 @@ static void test_if(void) {
   struct mjs *mjs = mjs_create();
   // printf("---> %s\n", mjs_stringify(mjs, mjs_eval(mjs, "if (true) 1", -1)));
   assert(numexpr(mjs, "if (true) 1;", 1.0f));
-  assert(numexpr(mjs, "if (0) 1;", 0.0f));
-  assert(mjs_eval(mjs, "if (false) 1.23", -1) == MJS_FALSE);
-  assert(mjs_eval(mjs, "if (null) 1.23", -1) == MJS_NULL);
-  assert(mjs_eval(mjs, "if (undefined) 1.23", -1) == MJS_UNDEFINED);
+  assert(mjs_eval(mjs, "if (0) 1;", -1) == MJS_UNDEFINED);
+  assert(mjs_eval(mjs, "true", -1) == MJS_TRUE);
+  assert(mjs_eval(mjs, "false", -1) == MJS_FALSE);
+  assert(mjs_eval(mjs, "null", -1) == MJS_NULL);
+  assert(mjs_eval(mjs, "undefined", -1) == MJS_UNDEFINED);
   mjs_destroy(mjs);
 }
 

@@ -1386,17 +1386,20 @@ static val_t parse_while(struct parser *p) {
 
 static val_t parse_if(struct parser *p) {
   val_t res = MJS_TRUE;
-  int saved_noexec = p->noexec;
+  int saved_noexec = p->noexec, cond;
   pnext(p);
   EXPECT(p, '(');
   pnext(p);
   TRY(parse_expr(p));
   EXPECT(p, ')');
   pnext(p);
-  if (is_true(p->vm, *vm_top(p->vm))) {
-    if (!p->noexec) vm_drop(p->vm);
-  } else {
-    p->noexec++;
+  if (!p->noexec) {
+    cond = is_true(p->vm, *vm_top(p->vm));
+    vm_drop(p->vm);
+    if (!cond) {
+      vm_push(p->vm, MJS_UNDEFINED);
+      p->noexec++;
+    }
   }
   TRY(parse_block_or_stmt(p, 1));
   p->noexec = saved_noexec;
@@ -1453,6 +1456,7 @@ static val_t parse_statement_list(struct parser *p, tok_t endtok) {
     res = parse_statement(p);
     while (p->tok.tok == ';') pnext(p);
   }
+  if (!p->noexec && p->vm->sp == 0) vm_push(p->vm, MJS_UNDEFINED);
   return res;
 }
 
