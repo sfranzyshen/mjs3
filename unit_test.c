@@ -234,12 +234,26 @@ static void test_if(void) {
   mjs_destroy(mjs);
 }
 
+static void test_function(void) {
+  struct mjs *mjs = mjs_create();
+  CHECK_NUMERIC("let f = function(){ 1; }; 1;", 1);
+  CHECK_NUMERIC("let f1 = function(a){ 1; }; 1;", 1);
+  CHECK_NUMERIC("let f2 = function(a,b){ 1; }; 1;", 1);
+  CHECK_NUMERIC("let f3 = function(a,b){ return a; }; f3(1,2);", 1);
+  // CHECK_NUMERIC("let f4 = function(a,b){ return b; }; f4(1,2);", 2);
+  // CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2,3);", 2);
+  // assert(mjs_eval(mjs, "let f6 = function(a,b){return b;};f6(1);", -1) ==
+  //       MJS_UNDEFINED);
+  mjs_destroy(mjs);
+}
+
 int main(void) {
   test_if();
   test_strings();
   test_expr();
   test_ffi();
   test_scopes();
+  test_function();
   printf("TEST PASSED\n");
   return 0;
 }
