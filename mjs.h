@@ -979,7 +979,7 @@ static val_t parse_function(struct parser *p) {
 }
 
 static val_t parse_object_literal(struct parser *p) {
-  val_t obj, key, val, res = MJS_TRUE;
+  val_t obj = MJS_UNDEFINED, key, val, res = MJS_TRUE;
   pnext(p);
   if (!p->noexec) {
     TRY(mk_obj(p->vm));
