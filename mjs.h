@@ -978,6 +978,37 @@ static val_t parse_function(struct parser *p) {
   return res;
 }
 
+static val_t parse_object_literal(struct parser *p) {
+  val_t obj, key, val, res = MJS_TRUE;
+  pnext(p);
+  if (!p->noexec) {
+    TRY(mk_obj(p->vm));
+    obj = res;
+    TRY(vm_push(p->vm, obj));
+  }
+  while (p->tok.tok != '}') {
+    if (p->tok.tok != TOK_IDENT && p->tok.tok != TOK_STR)
+      return vm_err(p->vm, "error parsing obj key");
+    key = mk_str(p->vm, p->tok.ptr, p->tok.len);
+    TRY(key);
+    pnext(p);
+    EXPECT(p, ':');
+    pnext(p);
+    TRY(parse_expr(p));
+    if (!p->noexec) {
+      val = *vm_top(p->vm);
+      TRY(mjs_set(p->vm, obj, key, val));
+      vm_drop(p->vm);
+    }
+    if (p->tok.tok == ',') {
+      pnext(p);
+    } else if (p->tok.tok != '}') {
+      return vm_err(p->vm, "parsing obj: expecting '}'");
+    }
+  }
+  return res;
+}
+
 static val_t parse_literal(struct parser *p, tok_t prev_op) {
   val_t res = MJS_TRUE;
   (void) prev_op;
@@ -991,6 +1022,9 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
         TRY(v);
         TRY(vm_push(p->vm, v));
       }
+      break;
+    case '{':
+      res = parse_object_literal(p);
       break;
     case TOK_IDENT:
       // LOG((DBGPREFIX "%s: IDENT: [%d]\n", __func__, prev_op));

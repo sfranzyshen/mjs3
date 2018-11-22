@@ -247,6 +247,14 @@ static void test_function(void) {
   mjs_destroy(mjs);
 }
 
+static void test_objects(void) {
+  struct mjs *mjs = mjs_create();
+  assert(typeexpr(mjs, "let o = {}; o", MJS_TYPE_OBJECT));
+  assert(typeexpr(mjs, "let o2 = {a:1}; o2", MJS_TYPE_OBJECT));
+  // assert(mjs_eval(mjs, "let o = {}; o.b", -1) == MJS_UNDEFINED);
+  mjs_destroy(mjs);
+}
+
 int main(void) {
   test_if();
   test_strings();
@@ -254,6 +262,7 @@ int main(void) {
   test_ffi();
   test_scopes();
   test_function();
+  test_objects();
   printf("TEST PASSED\n");
   return 0;
 }
