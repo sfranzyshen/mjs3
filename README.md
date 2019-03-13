@@ -3,7 +3,7 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
 
-mJS is a single-header JavaScript engine for microcontrollers.
+mJS is a single-source JavaScript engine for microcontrollers.
 
 ## Features
 
@@ -27,7 +27,7 @@ mJS is a single-header JavaScript engine for microcontrollers.
 
 ```c++
 #define MJS_STRING_POOL_SIZE 200
-#include "mjs.h"  // Sketch -> Add File -> mjs.h
+#include "mjs.c"  // Sketch -> Add File -> mjs.c
 
 extern "C" void myDelay(int x) { delay(x); }
 extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
