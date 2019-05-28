@@ -1,4 +1,4 @@
-#include "mjs.h"
+#include "mjs.c"
 
 #include <assert.h>
 #include <math.h>
@@ -182,9 +182,13 @@ static void test_strings(void) {
   mjs_destroy(mjs);
 }
 
-static float pi(void) { return 3.1415926f; }          // Return value of PI
-static float sub(float a, float b) { return a - b; }  // Subtract two numbers
-static char *fmt(const char *fmt, float f) {          // Format float value
+static float pi(void) {
+  return 3.1415926f;
+}  // Return value of PI
+static float sub(float a, float b) {
+  return a - b;
+}  // Subtract two numbers
+static char *fmt(const char *fmt, float f) {  // Format float value
   static char buf[20];
   snprintf(buf, sizeof(buf), fmt, f);
   return buf;

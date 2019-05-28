@@ -1,14 +1,20 @@
 // Copyright (c) 2013-2018 Cesanta Software Limited
 // All rights reserved
 
-#include "mjs.h"
+#include "mjs.c"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-static float sub(float a, float b) { return a - b; }
-static float sq(void) { return 42; }
-static int print(const char *a) { return printf("%s\n", a); }
+static float sub(float a, float b) {
+  return a - b;
+}
+static float sq(void) {
+  return 42;
+}
+static int print(const char *a) {
+  return printf("%s\n", a);
+}
 
 int main(int argc, char *argv[]) {
   int i;
