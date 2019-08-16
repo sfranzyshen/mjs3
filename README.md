@@ -54,8 +54,8 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 | Operations        | All but `!=`, `==`. Use `!==`, `===` instead |
 | typeof            | `typeof(...)`                |
 | delete            | `delete obj.k`               |
-| for, while, for..in  | `for (let k in obj) { ... }`, `while (...) {...}`, `for (...) { ... }` |
-| Declations        | `let a, b, c = 12.3, d = 'a'; ` |
+| while  					  | `while (...) {...}`          |
+| Declarations      | `let a, b, c = 12.3, d = 'a'; ` |
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
@@ -66,7 +66,7 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
-| Loops/switch      | `do { ... } while (...)`, `switch (...) {...}` |
+| Loops/switch      | `for (...) { ... }`,`for (let k in obj) { ... }`, `do { ... } while (...)`, `switch (...) {...}` |
 | Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | var               | `var ...`  (note: use `let ...`) |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
