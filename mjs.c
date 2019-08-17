@@ -1,6 +1,34 @@
 // Copyright (c) 2013-2018 Cesanta Software Limited
 // All rights reserved
 
+#ifndef MJS_DATA_STACK_SIZE
+#define MJS_DATA_STACK_SIZE 10
+#endif
+
+#ifndef MJS_CALL_STACK_SIZE
+#define MJS_CALL_STACK_SIZE 10
+#endif
+
+#ifndef MJS_STRING_POOL_SIZE
+#define MJS_STRING_POOL_SIZE 64
+#endif
+
+#ifndef MJS_OBJ_POOL_SIZE
+#define MJS_OBJ_POOL_SIZE 5
+#endif
+
+#ifndef MJS_PROP_POOL_SIZE
+#define MJS_PROP_POOL_SIZE 10
+#endif
+
+#ifndef MJS_CFUNC_POOL_SIZE
+#define MJS_CFUNC_POOL_SIZE 5
+#endif
+
+#ifndef MJS_ERROR_MESSAGE_SIZE
+#define MJS_ERROR_MESSAGE_SIZE 40
+#endif
+
 #ifndef MJS_H
 #define MJS_H
 
@@ -63,33 +91,6 @@ char *mjs_to_str(struct mjs *, mjs_val_t, mjs_len_t *);  // Unpack string
 
 // VM tunables
 
-#ifndef MJS_DATA_STACK_SIZE
-#define MJS_DATA_STACK_SIZE 10
-#endif
-
-#ifndef MJS_CALL_STACK_SIZE
-#define MJS_CALL_STACK_SIZE 10
-#endif
-
-#ifndef MJS_STRING_POOL_SIZE
-#define MJS_STRING_POOL_SIZE 64
-#endif
-
-#ifndef MJS_OBJ_POOL_SIZE
-#define MJS_OBJ_POOL_SIZE 5
-#endif
-
-#ifndef MJS_PROP_POOL_SIZE
-#define MJS_PROP_POOL_SIZE 10
-#endif
-
-#ifndef MJS_CFUNC_POOL_SIZE
-#define MJS_CFUNC_POOL_SIZE 5
-#endif
-
-#ifndef MJS_ERROR_MESSAGE_SIZE
-#define MJS_ERROR_MESSAGE_SIZE 40
-#endif
 
 ///////////////////////////////// IMPLEMENTATION //////////////////////////
 //
@@ -581,7 +582,9 @@ static int mjs_is_space(int c) {
          c == '\v';
 }
 
-static int mjs_is_digit(int c) { return c >= '0' && c <= '9'; }
+static int mjs_is_digit(int c) {
+  return c >= '0' && c <= '9';
+}
 
 static int mjs_is_alpha(int c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -945,13 +948,12 @@ static val_t parse_block(struct parser *p, int mkscope) {
 
 static val_t parse_function(struct parser *p) {
   val_t res = MJS_TRUE;
-  int arg_no = 0, name_provided = 0;
+  int name_provided = 0;
   struct tok tmp = p->tok;
   LOG((DBGPREFIX "%s: START: [%d]\n", __func__, p->vm->sp));
   p->noexec++;
   pnext(p);
   if (p->tok.tok == TOK_IDENT) {  // Function name provided: function ABC()...
-    // struct tok tmp = p->tok;
     name_provided = 1;
     pnext(p);
   }
@@ -960,7 +962,6 @@ static val_t parse_function(struct parser *p) {
   // Emit names of function arguments
   while (p->tok.tok != ')') {
     EXPECT(p, TOK_IDENT);
-    arg_no++;
     if (lookahead(p) == ',') pnext(p);
     pnext(p);
   }
@@ -1081,6 +1082,13 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
   return res;
 }
 
+static void setarg(struct parser *p, val_t scope, val_t val) {
+  val_t key = mk_str(p->vm, p->tok.ptr, p->tok.len);
+  mjs_set(p->vm, scope, key, val);
+  if (lookahead(p) == ',') pnext(p);
+  pnext(p);
+}
+
 static val_t call_js_function(struct parser *p, val_t f) {
   val_t res = MJS_TRUE;
   ind_t saved_scp = p->vm->csp;
@@ -1107,17 +1115,12 @@ static val_t call_js_function(struct parser *p, val_t f) {
     TRY(parse_expr(p));
     if (p->tok.tok == ',') pnext(p);
     // Check whether we have a defined name for this argument
-    if (p2.tok.tok == TOK_IDENT) {
-      val_t val = *vm_top(p->vm);
-      val_t key = mk_str(p->vm, p2.tok.ptr, p2.tok.len);
-      TRY(key);
-      TRY(mjs_set(p->vm, scope, key, val));
-      pnext(&p2);
-    }
+    if (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, *vm_top(p->vm));
     vm_drop(p->vm);  // Drop argument value from the data_stack
     LOG((DBGPREFIX "%s: P sp %d\n", __func__, p->vm->sp));
   }
-  while (p2.tok.tok != '{') pnext(&p2);  // Consume any leftover arguments
+  while (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, MJS_UNDEFINED);
+  while (p2.tok.tok != '{') pnext(&p2);  // Skip to the function body
   res = parse_block(&p2, 0);             // Execute function body
   LOG((DBGPREFIX "%s: R sp %d\n", __func__, p->vm->sp));
   while (p->vm->csp > saved_scp) delete_scope(p->vm);  // Restore current scope

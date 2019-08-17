@@ -10,6 +10,8 @@
 static int check_num(mjs_val_t v, float expected) {
   return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_to_float(v) - expected) < 0.0001;
+  // printf("%s: %g %g %d\n", __func__, mjs_to_float(v), expected, res);
+  // return res;
 }
 
 static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
@@ -241,13 +243,15 @@ static void test_if(void) {
 static void test_function(void) {
   struct mjs *mjs = mjs_create();
   CHECK_NUMERIC("let f = function(){ 1; }; 1;", 1);
+  CHECK_NUMERIC("let fx = function(a){ return a; }; 1;", 1);
+  CHECK_NUMERIC("let fy = function(a){ return a; }; fy(5);", 5);
+  CHECK_NUMERIC("(function(a){ return a; })(5);", 5);
   CHECK_NUMERIC("let f1 = function(a){ 1; }; 1;", 1);
   CHECK_NUMERIC("let f2 = function(a,b){ 1; }; 1;", 1);
-  CHECK_NUMERIC("let f3 = function(a,b){ return a; }; f3(1,2);", 1);
-  // CHECK_NUMERIC("let f4 = function(a,b){ return b; }; f4(1,2);", 2);
-  // CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2,3);", 2);
-  // assert(mjs_eval(mjs, "let f6 = function(a,b){return b;};f6(1);", -1) ==
-  //       MJS_UNDEFINED);
+  CHECK_NUMERIC("let f3 = function(a,b){ return a; }; f3(7,2);", 7);
+  CHECK_NUMERIC("let f4 = function(a,b){ return b; }; f4(1,2);", 2);
+  CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2);", 2);
+  assert(mjs_eval(mjs, "(function(a,b){return b;})(1);", -1) == MJS_UNDEFINED);
   mjs_destroy(mjs);
 }
 
