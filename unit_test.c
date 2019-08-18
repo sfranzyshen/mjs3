@@ -10,6 +10,8 @@
 static int check_num(mjs_val_t v, float expected) {
   return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_to_float(v) - expected) < 0.0001;
+  // printf("%s: %g %g %d\n", __func__, mjs_to_float(v), expected, res);
+  // return res;
 }
 
 static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
@@ -116,6 +118,7 @@ static void test_expr(void) {
   assert(numexpr(mjs, "+100", 100));
 
   assert(numexpr(mjs, "2 * (3 + 4)", 14));
+  assert(numexpr(mjs, "2 * (3 + 4 / 2 * 3)", 18));
 
   // ASSERT_EXEC_OK(mjs_exec(mjs, "NaN", &res));
   // ASSERT_EQ(!!isnan(mjs_get_double(mjs, res)), 1);
@@ -184,27 +187,36 @@ static void test_strings(void) {
 
 static float pi(void) {
   return 3.1415926f;
-}  // Return value of PI
+}
+
 static float sub(float a, float b) {
   return a - b;
-}  // Subtract two numbers
+}
+
 static char *fmt(const char *fmt, float f) {  // Format float value
   static char buf[20];
   snprintf(buf, sizeof(buf), fmt, f);
   return buf;
 }
 
+static float callcb(float (*cb)(void *), void *arg) {
+  printf("calling %p, arg %p\n", cb, arg);
+  return cb(arg);
+}
+
 static void test_ffi(void) {
   struct mjs *mjs = mjs_create();
-  mjs_inject_0(mjs, "pi", (mjs_cfunc_t) pi, CT_FLOAT);
-  mjs_inject_2(mjs, "sub", (mjs_cfunc_t) sub, CT_FLOAT, CT_FLOAT, CT_FLOAT);
-  mjs_inject_2(mjs, "fmt", (mjs_cfunc_t) fmt, CT_CHAR_PTR, CT_CHAR_PTR,
-               CT_FLOAT);
-  assert(numexpr(mjs, "sub(1,3);", -2));
+  mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
+  mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
+  mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
+  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "fss");
+  assert(numexpr(mjs, "sub(1.17,3.12);", -1.95));
+  assert(numexpr(mjs, "pi() * 2;", 6.2831852));
   assert(numexpr(mjs, "sub(0, 0xff);", -255));
   assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
   assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
   assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
+  // assert(numexpr(mjs, "ccb('%.2f', pi());", "3.14"));
   mjs_destroy(mjs);
 }
 
@@ -241,13 +253,15 @@ static void test_if(void) {
 static void test_function(void) {
   struct mjs *mjs = mjs_create();
   CHECK_NUMERIC("let f = function(){ 1; }; 1;", 1);
+  CHECK_NUMERIC("let fx = function(a){ return a; }; 1;", 1);
+  CHECK_NUMERIC("let fy = function(a){ return a; }; fy(5);", 5);
+  CHECK_NUMERIC("(function(a){ return a; })(5);", 5);
   CHECK_NUMERIC("let f1 = function(a){ 1; }; 1;", 1);
   CHECK_NUMERIC("let f2 = function(a,b){ 1; }; 1;", 1);
-  CHECK_NUMERIC("let f3 = function(a,b){ return a; }; f3(1,2);", 1);
-  // CHECK_NUMERIC("let f4 = function(a,b){ return b; }; f4(1,2);", 2);
-  // CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2,3);", 2);
-  // assert(mjs_eval(mjs, "let f6 = function(a,b){return b;};f6(1);", -1) ==
-  //       MJS_UNDEFINED);
+  CHECK_NUMERIC("let f3 = function(a,b){ return a; }; f3(7,2);", 7);
+  CHECK_NUMERIC("let f4 = function(a,b){ return b; }; f4(1,2);", 2);
+  CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2);", 2);
+  assert(mjs_eval(mjs, "(function(a,b){return b;})(1);", -1) == MJS_UNDEFINED);
   mjs_destroy(mjs);
 }
 

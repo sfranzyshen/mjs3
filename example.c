@@ -9,24 +9,36 @@
 static float sub(float a, float b) {
   return a - b;
 }
-static float sq(void) {
-  return 42;
+
+static int add(int a, int b) {
+  return a + b;
 }
-static int print(const char *a) {
-  return printf("%s\n", a);
+
+static float pi(void) {
+  return 3.1415926;
+}
+
+static char *fmt(const char *fmt, float f) {  // Format float value
+  static char buf[20];
+  snprintf(buf, sizeof(buf), fmt, f);
+  printf("PPPP [%s], %f, [%s]\n", fmt, f, buf);
+  return buf;
 }
 
 int main(int argc, char *argv[]) {
   int i;
   struct mjs *mjs = mjs_create();
-  val_t val = MJS_UNDEFINED;
-  mjs_inject_2(mjs, "sub", (mjs_cfunc_t) sub, CT_FLOAT, CT_FLOAT, CT_FLOAT);
-  mjs_inject_1(mjs, "print", (mjs_cfunc_t) print, CT_FLOAT, CT_CHAR_PTR);
-  mjs_inject_0(mjs, "sq", (mjs_cfunc_t) sq, CT_FLOAT);
-  for (i = 1; i < argc && argv[i][0] == '-' && val != MJS_ERROR; i++) {
+  val_t res = MJS_UNDEFINED;
+
+  mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
+  mjs_ffi(mjs, "add", (cfn_t) add, "iii");
+  mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
+  mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
+
+  for (i = 1; i < argc && argv[i][0] == '-' && res != MJS_ERROR; i++) {
     if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
       const char *code = argv[++i];
-      val = mjs_eval(mjs, code, -1);
+      res = mjs_eval(mjs, code, -1);
     } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
       printf("Usage: %s [-e js_expression]\n", argv[0]);
       return EXIT_SUCCESS;
@@ -35,7 +47,7 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
   }
-  printf("%s\n", mjs_stringify(mjs, val));
+  printf("%s\n", mjs_stringify(mjs, res));
   mjs_destroy(mjs);
   return EXIT_SUCCESS;
 }

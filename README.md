@@ -26,20 +26,20 @@ mJS is a single-source JavaScript engine for microcontrollers.
 ## Example - blinky in JavaScript on Arduino Mini
 
 ```c++
-#define MJS_STRING_POOL_SIZE 200
-#include "mjs.c"  // Sketch -> Add File -> mjs.c
+#define MJS_STRING_POOL_SIZE 200			// Buffer for all strings
+#include "mjs.c"  										// Sketch -> Add File -> mjs.c
 
 extern "C" void myDelay(int x) { delay(x); }
 extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
 
 void setup() {
   struct mjs *mjs = mjs_create();
-  mjs_inject_1(vm, "delay", (mjs_cfunc_t) myDelay, CT_INT);
-  mjs_inject_2(vm, "write", (mjs_cfunc_t) myDigitalWrite, CT_INT, CT_INT);
+  mjs_ffi1(vm, "delay", (cfn_t) myDelay, "vi");
+  mjs_ffi2(vm, "write", (cfn_t) myDigitalWrite, "vii");
   mjs_eval(mjs, "while (1) { write(13, 0); delay(100); write(13, 1); delay(100); }", -1);
 }
 
-void loop() { for(;;); }
+void loop() { delay(1000); }
 ```
 
 ```
@@ -54,8 +54,8 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 | Operations        | All but `!=`, `==`. Use `!==`, `===` instead |
 | typeof            | `typeof(...)`                |
 | delete            | `delete obj.k`               |
-| for, while, for..in  | `for (let k in obj) { ... }`, `while (...) {...}`, `for (...) { ... }` |
-| Declations        | `let a, b, c = 12.3, d = 'a'; ` |
+| while  					  | `while (...) {...}`          |
+| Declarations      | `let a, b, c = 12.3, d = 'a'; ` |
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
@@ -66,7 +66,7 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
-| Loops/switch      | `do { ... } while (...)`, `switch (...) {...}` |
+| Loops/switch      | `for (...) { ... }`,`for (let k in obj) { ... }`, `do { ... } while (...)`, `switch (...) {...}` |
 | Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | var               | `var ...`  (note: use `let ...`) |
 | Closures          | `let f = function() { let x = 1; return function() { return x; } };`  |
@@ -80,27 +80,6 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 | ----------------- | ----------------------------------------- |
 | `s[offset]`       | Return byte value at `offset`. `s` is either a string, or a number. A number is interprepted as `uint8_t *` pointer. Example: `'abc'[0]` returns 0x61. To read a byte at address `0x100`, use `0x100[0];`. | |
 
-## C API Reference
-
-```c
-// Types
-typedef uint32_t mjs_val_t;
-typedef uint32_t mjs_len_t;
-
-// API
-struct mjs *mjs_create(void);    // Create instance
-void mjs_destroy(struct mjs *);  // Destroy instance
-mjs_val_t mjs_eval(struct mjs *mjs, const char *buf, int len);  // Evaluate
-const char *mjs_stringify(struct mjs *, mjs_val_t v);  // Stringify value
-unsigned long mjs_size(void);                          // Get VM size
-
-float mjs_get_number(mjs_val_t v);
-char *mjs_get_string(struct mjs *, mjs_val_t v, mjs_len_t *len);
-```
-
-## Usage example
-
-See `example.c`
 
 ## LICENSE
 

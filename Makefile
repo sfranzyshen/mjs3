@@ -1,19 +1,20 @@
 PROG = mjs
+DBG ?=
 #MFLAGS += -DMJS_DEBUG
-TFLAGS += -DMJS_PROP_POOL_SIZE=30 -DMJS_STRING_POOL_SIZE=200
+TFLAGS += -DMJS_PROP_POOL_SIZE=30 -DMJS_STRING_POOL_SIZE=512
+CFLAGS += -W -Wall -Werror -Wstrict-overflow -fno-strict-aliasing -Os -g
 
-all: $(PROG) test vc98 test98
+all: $(PROG) test cpptest vc98 test98
 .PHONY: test $(PROG)
 
-CFLAGS += -W -Wall -Werror -Wstrict-overflow -fno-strict-aliasing -Os -g
 $(PROG): mjs.c example.c
 	$(CC) -o $@ example.c -DNDEBUG $(CFLAGS) $(MFLAGS)
 
 test: unit_test.c mjs.c
-	cc -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS) && ./$@
+	cc -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS) && $(DBG) ./$@
 
 cpptest:
-	clang -x c++ -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS) && ./$@
+	clang -x c++ -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS) && $(DBG) ./$@
 
 VC98 = docker run -v $(CURDIR):$(CURDIR) -w $(CURDIR) docker.io/mgos/vc98
 VCFLAGS = /nologo /W4 /O1
