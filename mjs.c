@@ -1707,14 +1707,14 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
 
 static val_t call_c_function(struct parser *p, val_t f) {
   struct cfunc *cf = &p->vm->cfuncs[VAL_PAYLOAD(f)];
-  uint8_t i, num_args = 0;
+  int i, num_args = 0;
   val_t res = MJS_UNDEFINED;
   while (p->tok.tok != ')') {
     TRY(parse_expr(p));  // Push next arg to the data_stack
     if (p->tok.tok == ',') pnext(p);
     num_args++;
   }
-  if (num_args + 1 != strlen(cf->types)) {
+  if (num_args + 1 != (int) strlen(cf->types)) {
     res = vm_err(p->vm, "expected args: [%s]", cf->types);
   } else {
     val_t v = MJS_UNDEFINED, *top = vm_top(p->vm);
