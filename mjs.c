@@ -210,7 +210,7 @@ static val_t vm_err(struct vm *vm, const char *fmt, ...) {
   va_start(ap, fmt);
   vsnprintf(vm->error_message, sizeof(vm->error_message), fmt, ap);
   va_end(ap);
-  fprintf(stderr, "JSERROR: %s\n", vm->error_message);
+  // fprintf(stderr, "JSERROR: %s\n", vm->error_message);
   // LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
   return MJS_ERROR;
 }
@@ -1156,7 +1156,8 @@ enum ffi_ctype {
 
 union ffi_val {
   ffi_word_t w;
-  int64_t i;
+  // int64_t i;
+  unsigned long i;
   double d;
   float f;
 };
