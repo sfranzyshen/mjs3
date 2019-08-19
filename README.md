@@ -26,16 +26,16 @@ mJS is a single-source JavaScript engine for microcontrollers.
 ## Embedded example: blinky in JavaScript on Arduino Mini
 
 ```c++
-#define MJS_STRING_POOL_SIZE 200			// Buffer for all strings
-#include "mjs.c"  										// Sketch -> Add File -> mjs.c
+#define MJS_STRING_POOL_SIZE 200    // Buffer for all strings
+#include "mjs.c"                    // Sketch -> Add File -> mjs.c
 
 extern "C" void myDelay(int x) { delay(x); }
 extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
 
 void setup() {
-  struct mjs *vm = mjs_create();												// Create JS instance
-  mjs_ffi(vm, "delay", (cfn_t) myDelay, "vi");					// Import delay()
-  mjs_ffi(vm, "write", (cfn_t) myDigitalWrite, "vii");	// Import write()
+  struct mjs *vm = mjs_create();                        // Create JS instance
+  mjs_ffi(vm, "delay", (cfn_t) myDelay, "vi");          // Import delay()
+  mjs_ffi(vm, "write", (cfn_t) myDigitalWrite, "vii");  // Import write()
   mjs_eval(vm, "while (1) { write(13, 0); delay(100); write(13, 1); delay(100); }", -1);
 }
 
