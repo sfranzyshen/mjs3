@@ -1,5 +1,18 @@
 // Copyright (c) 2013-2019 Cesanta Software Limited
 // All rights reserved
+//
+// This software is dual-licensed: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License version 2 as
+// published by the Free Software Foundation. For the terms of this
+// license, see <http://www.gnu.org/licenses/>.
+//
+// You are free to use this software under the terms of the GNU General
+// Public License, but WITHOUT ANY WARRANTY; without even the implied
+// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the GNU General Public License for more details.
+//
+// Alternatively, you can license this software under a commercial
+// license, please contact us at https://mdash.net/home/company.html
 
 #ifndef MJS_DATA_STACK_SIZE
 #define MJS_DATA_STACK_SIZE 10
@@ -160,7 +173,7 @@ struct obj {
 
 struct cfunc {
   cfn_t fn;           // Pointer to C function
-  const char *types;  // Types of return values and arguments
+  const char *decl;   // Declaration of return values and arguments
 };
 
 struct vm {
@@ -197,6 +210,7 @@ static val_t vm_err(struct vm *vm, const char *fmt, ...) {
   va_start(ap, fmt);
   vsnprintf(vm->error_message, sizeof(vm->error_message), fmt, ap);
   va_end(ap);
+  // fprintf(stderr, "JSERROR: %s\n", vm->error_message);
   // LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
   return MJS_ERROR;
 }
@@ -1140,13 +1154,17 @@ enum ffi_ctype {
   FFI_CTYPE_DOUBLE,
 };
 
+union ffi_val {
+  ffi_word_t w;
+  // int64_t i;
+  unsigned long i;
+  double d;
+  float f;
+};
+
 struct ffi_arg {
   enum ffi_ctype ctype;
-  union {
-    int64_t i;
-    double d;
-    float f;
-  } v;
+  union ffi_val v;
 };
 
 #define IS_W(arg) ((arg).ctype == FFI_CTYPE_WORD)
@@ -1319,11 +1337,11 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
     floats += (IS_F(args[i]));
   }
 
-  /* Doubles and floats are not supported together atm */
+  // Doubles and floats are not supported together atm
   if (doubles > 0 && floats > 0) return -1;
 
   switch (res->ctype) {
-    case FFI_CTYPE_WORD: {  // {{{
+    case FFI_CTYPE_WORD: {
       ffi_word_t r;
       if (doubles == 0) {
         if (floats == 0) {
@@ -1343,7 +1361,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
             abort();
           }
         } else {
-          /* There are some floats */
+          // There are some floats
           switch (nargs) {
             case 0:
             case 1:
@@ -1392,7 +1410,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
           }
         }
       } else {
-        /* There are some doubles */
+        // There are some doubles
         switch (nargs) {
           case 0:
           case 1:
@@ -1441,15 +1459,13 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
         }
       }
       res->v.i = (uint64_t) r;
-    } break;               /* }}} */
-    case FFI_CTYPE_BOOL: { /* {{{ */
+    } break;
+    case FFI_CTYPE_BOOL: {
       ffi_word_t r;
       if (doubles == 0) {
         if (floats == 0) {
-          /*
-           * No double and no float args: we currently support up to 6
-           * word-sized arguments
-           */
+          // No double and no float args: we currently support up to 6
+          // word-sized arguments
           if (nargs <= 4) {
             b4w_t f = (b4w_t) func;
             r = f(W(args[0]), W(args[1]), W(args[2]), W(args[3]));
@@ -1464,7 +1480,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
             abort();
           }
         } else {
-          /* There are some floats */
+          // There are some floats
           switch (nargs) {
             case 0:
             case 1:
@@ -1513,7 +1529,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
           }
         }
       } else {
-        /* There are some doubles */
+        // There are some doubles
         switch (nargs) {
           case 0:
           case 1:
@@ -1562,8 +1578,8 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
         }
       }
       res->v.i = (uint64_t) r;
-    } break;                 /* }}} */
-    case FFI_CTYPE_DOUBLE: { /* {{{ */
+    } break;
+    case FFI_CTYPE_DOUBLE: {
       double r;
       if (doubles == 0) {
         /* No double args: we currently support up to 6 word-sized arguments
@@ -1630,12 +1646,11 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
         }
       }
       res->v.d = r;
-    } break;                /* }}} */
-    case FFI_CTYPE_FLOAT: { /* {{{ */
+    } break;
+    case FFI_CTYPE_FLOAT: {
       double r;
       if (floats == 0) {
-        /* No float args: we currently support up to 6 word-sized arguments
-         */
+        // No float args: we currently support up to 6 word-sized arguments
         if (nargs <= 4) {
           f4w_t f = (f4w_t) func;
           r = f(W(args[0]), W(args[1]), W(args[2]), W(args[3]));
@@ -1650,7 +1665,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
           abort();
         }
       } else {
-        /* There are some float args */
+        // There are some floats
         switch (nargs) {
           case 0:
           case 1:
@@ -1699,60 +1714,169 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
         }
       }
       res->v.f = r;
-    } break; /* }}} */
+    } break;
   }
 
   return 0;
 }
 
-static val_t call_c_function(struct parser *p, val_t f) {
-  struct cfunc *cf = &p->vm->cfuncs[VAL_PAYLOAD(f)];
-  int i, num_args = 0;
-  val_t res = MJS_UNDEFINED;
-  while (p->tok.tok != ')') {
-    TRY(parse_expr(p));  // Push next arg to the data_stack
-    if (p->tok.tok == ',') pnext(p);
+struct fficbparam {
+  struct parser *p;
+  const char *decl;
+  val_t jsfunc;
+};
+
+static ffi_word_t fficb(struct fficbparam *cbp, union ffi_val *args) {
+  char buf[100];
+  int num_args = 0, n = 0;
+  const char *s;
+  struct parser p2;
+  val_t res;
+  for (s = cbp->decl + 1; *s != '\0' && *s != ']'; s++) {
+    // clang-format off
+    if (num_args > 0) n += snprintf(buf + n, sizeof(buf) - n, "%s", ",");
+    switch (*s) {
+      case 'i': n += snprintf(buf + n, sizeof(buf) - n, "%d", (int) args[num_args].i); break;
+      default: n += snprintf(buf + n, sizeof(buf) - n, "null"); break;
+    }
+    // clang-format on
     num_args++;
   }
-  if (num_args + 1 != (int) strlen(cf->types)) {
-    res = vm_err(p->vm, "expected args: [%s]", cf->types);
-  } else {
-    val_t v = MJS_UNDEFINED, *top = vm_top(p->vm);
-    struct ffi_arg result, args[FFI_MAX_ARGS_CNT];
-    memset(args, 0, sizeof(args));
-    // clang-format off
-    for (i = 0; i < num_args; i++) {
-			struct ffi_arg *arg = &args[i];
-			val_t av = top[i - 1];
-			//printf("--> arg [%c] [%s]\n", cf->types[i + 1], tostr(p->vm, av));
-      switch (cf->types[i + 1]) {
-        case 's': ffi_set_ptr(arg, mjs_to_str(p->vm, av, 0)); break;
-        case 'b': ffi_set_bool(arg, tof(av)); break;
-        case 'f': ffi_set_float(arg, tof(av)); break;
-        case 'F': ffi_set_double(arg, (double) tof(av)); break;
-        default: ffi_set_word(arg, (int) tof(av)); break;
-      }
-    }
-    switch (cf->types[0]) {
-      case 'f': result.ctype = FFI_CTYPE_FLOAT; break;
-      case 'F': result.ctype = FFI_CTYPE_DOUBLE; break;
-      case 'b': result.ctype = FFI_CTYPE_BOOL; break;
-      default: result.ctype = FFI_CTYPE_WORD; break;
-    }
-    ffi_call(cf->fn, num_args, &result, args);
-    switch (cf->types[0]) {
-      case 's': v = mk_str(p->vm, (char *) result.v.i, -1); break;
-      case 'f': v = tov(result.v.f); break;
-      case 'F': v = tov((float) result.v.d); break;
-      default: v = tov((float) result.v.i); break;
-    }
-    // clang-format off
-    while (num_args-- > 0) vm_drop(p->vm);  // Abandon pushed args
-    vm_drop(p->vm);                         // Abandon function object
-    res = vm_push(p->vm, v);                // Push call result
+  n += snprintf(buf + n, sizeof(buf) - n, "%s", ")");
+  // printf("js cb: %p '%s'\n", cbp, buf);
+  p2 = mk_parser(cbp->p->vm, buf, n);
+  pnext(&p2);
+  call_js_function(&p2, cbp->jsfunc);
+  res = *vm_top(cbp->p->vm);
+  // printf("js cb res: %s\n", tostr(cbp->p->vm, res));
+  return tof(res);
+}
+
+static void ffiinitcbargs(union ffi_val *args, ffi_word_t w1, ffi_word_t w2,
+                          ffi_word_t w3, ffi_word_t w4, ffi_word_t w5,
+                          ffi_word_t w6) {
+  args[0].i = w1;
+  args[1].i = w2;
+  args[2].i = w3;
+  args[3].i = w4;
+  args[4].i = w5;
+  args[5].i = w6;
+}
+
+static ffi_word_t fficb1(ffi_word_t w1, ffi_word_t w2, ffi_word_t w3,
+                         ffi_word_t w4, ffi_word_t w5, ffi_word_t w6) {
+  union ffi_val args[FFI_MAX_ARGS_CNT];
+  ffiinitcbargs(args, w1, w2, w3, w4, w5, w6);
+  return fficb((struct fficbparam *) w1, args);
+}
+
+static ffi_word_t fficb2(ffi_word_t w1, ffi_word_t w2, ffi_word_t w3,
+                         ffi_word_t w4, ffi_word_t w5, ffi_word_t w6) {
+  union ffi_val args[FFI_MAX_ARGS_CNT];
+  ffiinitcbargs(args, w1, w2, w3, w4, w5, w6);
+  return fficb((struct fficbparam *) w2, args);
+}
+
+static ffi_word_t fficb3(ffi_word_t w1, ffi_word_t w2, ffi_word_t w3,
+                         ffi_word_t w4, ffi_word_t w5, ffi_word_t w6) {
+  union ffi_val args[FFI_MAX_ARGS_CNT];
+  ffiinitcbargs(args, w1, w2, w3, w4, w5, w6);
+  return fficb((struct fficbparam *) w3, args);
+}
+
+static ffi_word_t fficb4(ffi_word_t w1, ffi_word_t w2, ffi_word_t w3,
+                         ffi_word_t w4, ffi_word_t w5, ffi_word_t w6) {
+  union ffi_val args[FFI_MAX_ARGS_CNT];
+  ffiinitcbargs(args, w1, w2, w3, w4, w5, w6);
+  return fficb((struct fficbparam *) w4, args);
+}
+
+static ffi_word_t fficb5(ffi_word_t w1, ffi_word_t w2, ffi_word_t w3,
+                         ffi_word_t w4, ffi_word_t w5, ffi_word_t w6) {
+  union ffi_val args[FFI_MAX_ARGS_CNT];
+  ffiinitcbargs(args, w1, w2, w3, w4, w5, w6);
+  return fficb((struct fficbparam *) w5, args);
+}
+
+static ffi_word_t fficb6(ffi_word_t w1, ffi_word_t w2, ffi_word_t w3,
+                         ffi_word_t w4, ffi_word_t w5, ffi_word_t w6) {
+  union ffi_val args[FFI_MAX_ARGS_CNT];
+  ffiinitcbargs(args, w1, w2, w3, w4, w5, w6);
+  return fficb((struct fficbparam *) w6, args);
+}
+
+static w6w_t setfficb(struct parser *p, val_t jsfunc, struct fficbparam *cbp,
+                      const char *decl, int *idx) {
+  w6w_t res = 0, cbs[] = {fficb1, fficb2, fficb3, fficb4, fficb5, fficb6, 0};
+  int i = 0;
+  cbp->p = p;
+  cbp->jsfunc = jsfunc;
+  cbp->decl = decl + *idx + 1;
+  if (decl[*idx] != ']') (*idx)++;  // Skip callback return value type
+  while (decl[*idx + 1] != '\0' && decl[*idx] != ']') {
+    (*idx)++;
+    if (decl[*idx] == 'u') res = cbs[i];
+    if (cbs[i] != NULL) i++;
   }
-  LOG((DBGPREFIX "%s: %d\n", __func__, p->tok.tok));
   return res;
+}
+
+static val_t call_c_function(struct parser *p, val_t f) {
+  struct cfunc *cf = &p->vm->cfuncs[VAL_PAYLOAD(f)];
+  val_t res = MJS_UNDEFINED, v = MJS_UNDEFINED, *top = vm_top(p->vm);
+  struct ffi_arg args[FFI_MAX_ARGS_CNT + 1];  // First arg - return value
+  struct fficbparam cbp;                      // For C callbacks only
+  int i, num_passed_args = 0, num_expected_args = 0;
+
+  // Evaluate all JS parameters passed to the C function, push them on stack
+  while (p->tok.tok != ')') {
+    TRY(parse_expr(p));               // Push to the data_stack
+    if (p->tok.tok == ',') pnext(p);  // Skip to the next arg
+    num_passed_args++;
+  }
+
+  // clang-format off
+	// Set type of the return value
+  memset(args, 0, sizeof(args));
+  memset(&cbp, 0, sizeof(cbp));
+	//printf("--> cbp %p\n", &cbp);
+	switch (cf->decl[0]) {
+		case 'f': args[0].ctype = FFI_CTYPE_FLOAT; break;
+		case 'F': args[0].ctype = FFI_CTYPE_DOUBLE; break;
+		case 'b': args[0].ctype = FFI_CTYPE_BOOL; break;
+		default: args[0].ctype = FFI_CTYPE_WORD; break;
+	}
+	// Prepare FFI arguments - fetch them from the passed JS arguments
+	for (i = 1; cf->decl[i] != '\0'; i++) {  // Start from 1 to skip ret value
+		struct ffi_arg *arg = &args[num_expected_args + 1];
+		val_t av = top[num_expected_args + 1];
+		//printf("--> arg [%c] [%s]\n", cf->decl[i], tostr(p->vm, av));
+		switch (cf->decl[i]) {
+			case '[': ffi_set_ptr(arg, (void *) setfficb(p, av, &cbp, cf->decl, &i)); break;
+			case 'u': ffi_set_ptr(arg, &cbp); break;
+			case 's': ffi_set_ptr(arg, mjs_to_str(p->vm, av, 0)); break;
+			case 'b': ffi_set_bool(arg, tof(av)); break;
+			case 'f': ffi_set_float(arg, tof(av)); break;
+			case 'F': ffi_set_double(arg, (double) tof(av)); break;
+			default: ffi_set_word(arg, (int) tof(av)); break;
+		}
+		num_expected_args++;
+	}
+
+	if (num_passed_args != num_expected_args) return vm_err(p->vm, "ffi call %s: %d vs %d", cf->decl, num_expected_args, num_passed_args);
+
+	ffi_call(cf->fn, num_passed_args, &args[0], &args[1]);
+	switch (cf->decl[0]) {
+		case 's': v = mk_str(p->vm, (char *) args[0].v.i, -1); break;
+		case 'f': v = tov(args[0].v.f); break;
+		case 'F': v = tov((float) args[0].v.d); break;
+		default: v = tov((float) args[0].v.i); break;
+	}
+  // clang-format on
+        while (vm_top(p->vm) > top) vm_drop(p->vm);  // Abandon pushed args
+        vm_drop(p->vm);                              // Abandon function object
+        LOG((DBGPREFIX "%s: %d\n", __func__, p->tok.tok));
+        return vm_push(p->vm, v);  // Push call result
 }
 
 static val_t parse_call_dot_mem(struct parser *p, int prev_op) {
@@ -2090,20 +2214,19 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   return v;
 }
 
-val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *types) {
+val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *decl) {
   val_t v = mk_cfunc(vm);
   struct cfunc *cfunc = &vm->cfuncs[VAL_PAYLOAD(v)];
   if (v == MJS_ERROR) return v;
-  if (types == NULL || types[0] == '\0') return vm_err(vm, "wrong type spec");
-  if (strlen(types) > 3) return vm_err(vm, "max 2 ffi args");
+  if (decl == NULL || decl[0] == '\0') return vm_err(vm, "wrong type spec");
   cfunc->fn = fn;
-  cfunc->types = types;
+  cfunc->decl = decl;
   return v;
 }
 
-val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *types) {
-  return mjs_set(mjs, mjs_get_global(mjs), mjs_mk_str(vm, p, -1),
-                 mjs_mk_c_func(vm, f, types));
+val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
+  val_t v = mjs_get_global(vm);
+  return mjs_set(mjs, v, mjs_mk_str(vm, p, -1), mjs_mk_c_func(vm, f, s));
 }
 
 #endif  // MJS_H

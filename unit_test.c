@@ -185,41 +185,6 @@ static void test_strings(void) {
   mjs_destroy(mjs);
 }
 
-static float pi(void) {
-  return 3.1415926f;
-}
-
-static float sub(float a, float b) {
-  return a - b;
-}
-
-static char *fmt(const char *fmt, float f) {  // Format float value
-  static char buf[20];
-  snprintf(buf, sizeof(buf), fmt, f);
-  return buf;
-}
-
-static float callcb(float (*cb)(void *), void *arg) {
-  printf("calling %p, arg %p\n", cb, arg);
-  return cb(arg);
-}
-
-static void test_ffi(void) {
-  struct mjs *mjs = mjs_create();
-  mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
-  mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
-  mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
-  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "fss");
-  assert(numexpr(mjs, "sub(1.17,3.12);", -1.95));
-  assert(numexpr(mjs, "pi() * 2;", 6.2831852));
-  assert(numexpr(mjs, "sub(0, 0xff);", -255));
-  assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
-  assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
-  assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
-  // assert(numexpr(mjs, "ccb('%.2f', pi());", "3.14"));
-  mjs_destroy(mjs);
-}
-
 static void test_scopes(void) {
   struct mjs *mjs = mjs_create();
   assert(numexpr(mjs, "1.23", 1.23f));
@@ -270,6 +235,47 @@ static void test_objects(void) {
   assert(typeexpr(mjs, "let o = {}; o", MJS_TYPE_OBJECT));
   assert(typeexpr(mjs, "let o2 = {a:1}; o2", MJS_TYPE_OBJECT));
   // assert(mjs_eval(mjs, "let o = {}; o.b", -1) == MJS_UNDEFINED);
+  mjs_destroy(mjs);
+}
+
+static float pi(void) {
+  return 3.1415926f;
+}
+
+static float sub(float a, float b) {
+  return a - b;
+}
+
+static char *fmt(const char *fmt, float f) {  // Format float value
+  static char buf[20];
+  snprintf(buf, sizeof(buf), fmt, f);
+  return buf;
+}
+
+static double mul(double a, double b) {
+  return a * b;
+}
+
+static int callcb(int (*cb)(int, int, void *), void *arg) {
+  // printf("calling %p, arg %p\n", cb, arg);
+  return cb(2, 3, arg);
+}
+
+static void test_ffi(void) {
+  struct mjs *mjs = mjs_create();
+  mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
+  mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
+  mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
+  mjs_ffi(mjs, "mul", (cfn_t) mul, "FFF");
+  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "i[iiiu]u");
+  assert(numexpr(mjs, "sub(1.17,3.12);", -1.95));
+  assert(numexpr(mjs, "pi() * 2;", 6.2831852));
+  assert(numexpr(mjs, "sub(0, 0xff);", -255));
+  assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
+  assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
+  assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
+  assert(numexpr(mjs, "mul(1.323, 7.321)", 9.685683));
+  assert(numexpr(mjs, "ccb(function(a,b,c){return a+b;}, 123);", 5));
   mjs_destroy(mjs);
 }
 
