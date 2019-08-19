@@ -199,9 +199,9 @@ static char *fmt(const char *fmt, float f) {  // Format float value
   return buf;
 }
 
-static float callcb(float (*cb)(void *), void *arg) {
-  printf("calling %p, arg %p\n", cb, arg);
-  return cb(arg);
+static int callcb(int (*cb)(int, int, void *), void *arg) {
+  // printf("calling %p, arg %p\n", cb, arg);
+  return cb(2, 3, arg);
 }
 
 static void test_ffi(void) {
@@ -209,14 +209,14 @@ static void test_ffi(void) {
   mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
   mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
   mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
-  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "fss");
+  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "i[iiiu]u");
   assert(numexpr(mjs, "sub(1.17,3.12);", -1.95));
   assert(numexpr(mjs, "pi() * 2;", 6.2831852));
   assert(numexpr(mjs, "sub(0, 0xff);", -255));
   assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
   assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
   assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
-  // assert(numexpr(mjs, "ccb('%.2f', pi());", "3.14"));
+  assert(numexpr(mjs, "ccb(function(a,b,c){return a+b;}, 123);", 5));
   mjs_destroy(mjs);
 }
 

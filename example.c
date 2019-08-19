@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) {
   mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
   mjs_ffi(mjs, "add", (cfn_t) add, "iii");
   mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
+  mjs_ffi(mjs, "sin", (cfn_t) sin, "FF");
   mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
 
   for (i = 1; i < argc && argv[i][0] == '-' && res != MJS_ERROR; i++) {
