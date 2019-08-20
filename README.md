@@ -1,4 +1,4 @@
-# mJS - a JS engine for embedded systems
+# mJS - a JS engine for Arduino systems
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
@@ -25,26 +25,37 @@ mJS is a single-source JavaScript engine for microcontrollers.
 
 ## Example - blinky in JavaScript on Arduino Mini
 
-```c++
-#define MJS_STRING_POOL_SIZE 200			// Buffer for all strings
-#include "mjs.c"  										// Sketch -> Add File -> mjs.c
+```
+#define MJS_STRING_POOL_SIZE 200      // Buffer for all strings
+#include "mjs3-Arduino.c"                     
 
-extern "C" void myDelay(int x) { delay(x); }
-extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
-
-void setup() {
-  struct mjs *mjs = mjs_create();
-  mjs_ffi1(vm, "delay", (cfn_t) myDelay, "vi");
-  mjs_ffi2(vm, "write", (cfn_t) myDigitalWrite, "vii");
-  mjs_eval(mjs, "while (1) { write(13, 0); delay(100); write(13, 1); delay(100); }", -1);
+extern void myDelay(int x) { 
+  delay(x);
 }
 
-void loop() { delay(1000); }
+extern void myDigitalWrite(int x, int y) {
+  digitalWrite(x, y);
+}
+
+void setup() {
+  pinMode(16, OUTPUT);                                  // Initialize the LED_BUILTIN pin as an output
+  
+  struct mjs *vm = mjs_create();                        // Create JS instance
+  mjs_ffi(vm, "delay", (cfn_t) myDelay, "vi");          // Import delay()
+  mjs_ffi(vm, "write", (cfn_t) myDigitalWrite, "vii");  // Import write()
+  
+  mjs_eval(vm, "while (1) { write(16, 0); delay(500); write(16, 1); delay(500); }", -1);
+}
+
+void loop() {
+  //delay(1000);
+}
+
 ```
 
 ```
-Sketch uses 17620 bytes (57%) of program storage space. Maximum is 30720 bytes.
-Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for local variables. Maximum is 2048 bytes.
+Sketch uses 272668 bytes (26%) of program storage space. Maximum is 1044464 bytes.
+Global variables use 27812 bytes (33%) of dynamic memory, leaving 54108 bytes for local variables. Maximum is 81920 bytes.
 ```
 
 ## Supported standard operations and constructs
