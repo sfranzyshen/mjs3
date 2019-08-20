@@ -3,7 +3,7 @@
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
 
-mJS is a single-source JavaScript engine for microcontrollers.
+mJS is a single-source JavaScript engine for Arduino microcontrollers.
 
 ## Features
 
@@ -23,7 +23,7 @@ mJS is a single-source JavaScript engine for microcontrollers.
 - mJS VM executes JS source directly, no AST/bytecode is generated
 - Simple FFI API to inject existing C functions into JS
 
-## Example - blinky in JavaScript on Arduino Mini
+## Example - blinky in JavaScript on Arduino Platform (ESP8266)
 
 ```
 #define MJS_STRING_POOL_SIZE 200      // Buffer for all strings
