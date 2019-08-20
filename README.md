@@ -33,6 +33,7 @@ extern "C" void myDelay(int x) { delay(x); }
 extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
 
 void setup() {
+  pinMode(13, OUTPUT);
   struct mjs *vm = mjs_create();                        // Create JS instance
   mjs_ffi(vm, "delay", (cfn_t) myDelay, "vi");          // Import delay()
   mjs_ffi(vm, "write", (cfn_t) myDigitalWrite, "vii");  // Import write()
