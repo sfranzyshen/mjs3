@@ -7,10 +7,10 @@
 
 #define CHECK_NUMERIC(x, y) assert(numexpr(mjs, (x), (y)))
 
-static int check_num(mjs_val_t v, float expected) {
+static bool check_num(mjs_val_t v, float expected) {
+  // printf("%s: %g %g\n", __func__, tof(v), expected);
   return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_to_float(v) - expected) < 0.0001;
-  // printf("%s: %g %g %d\n", __func__, mjs_to_float(v), expected, res);
   // return res;
 }
 
@@ -22,8 +22,7 @@ static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
 }
 
 static int numexpr(struct mjs *mjs, const char *code, float expected) {
-  mjs_val_t v = mjs_eval(mjs, code, strlen(code));
-  return mjs_type(v) != MJS_TYPE_NUMBER ? 0 : check_num(v, expected);
+  return check_num(mjs_eval(mjs, code, strlen(code)), expected);
 }
 
 static int strexpr(struct mjs *mjs, const char *code, const char *expected) {
@@ -181,7 +180,9 @@ static void test_strings(void) {
   assert(strexpr(mjs, "'vb'", "vb"));
   assert(strexpr(mjs, "let a, b = function(x){}, c = 'aa'", "aa"));
   assert(strexpr(mjs, "let a2, b2 = function(){}, cv = 'aa'", "aa"));
-  // printf("--> %d\n", (int) mjs->stringbuf_len);
+  CHECK_NUMERIC("'abc'.length", 3);
+  CHECK_NUMERIC("('abc' + 'xy').length", 5);
+  CHECK_NUMERIC("'ы'.length", 2);
   mjs_destroy(mjs);
 }
 
@@ -216,6 +217,7 @@ static void test_if(void) {
 }
 
 static void test_function(void) {
+  ind_t len;
   struct mjs *mjs = mjs_create();
   CHECK_NUMERIC("let f = function(){ 1; }; 1;", 1);
   CHECK_NUMERIC("let fx = function(a){ return a; }; 1;", 1);
@@ -227,6 +229,13 @@ static void test_function(void) {
   CHECK_NUMERIC("let f4 = function(a,b){ return b; }; f4(1,2);", 2);
   CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2);", 2);
   assert(mjs_eval(mjs, "(function(a,b){return b;})(1);", -1) == MJS_UNDEFINED);
+
+  // Test that the function's string args get garbage collected
+  mjs_eval(mjs, "let f7 = function(s){return s.length;};", -1);
+  len = mjs->stringbuf_len;
+  CHECK_NUMERIC("f7('abc')", 3);
+  assert(mjs->stringbuf_len == len);
+
   mjs_destroy(mjs);
 }
 
@@ -234,7 +243,8 @@ static void test_objects(void) {
   struct mjs *mjs = mjs_create();
   assert(typeexpr(mjs, "let o = {}; o", MJS_TYPE_OBJECT));
   assert(typeexpr(mjs, "let o2 = {a:1}; o2", MJS_TYPE_OBJECT));
-  // assert(mjs_eval(mjs, "let o = {}; o.b", -1) == MJS_UNDEFINED);
+  assert(mjs_eval(mjs, "let o3 = {}; o3.b", -1) == MJS_UNDEFINED);
+  CHECK_NUMERIC("let o4 = {a:1,b:2}; o4.a", 1);
   mjs_destroy(mjs);
 }
 
