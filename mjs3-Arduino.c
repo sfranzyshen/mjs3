@@ -23,7 +23,7 @@
 #endif
 
 #ifndef MJS_STRING_POOL_SIZE
-#define MJS_STRING_POOL_SIZE 64
+#define MJS_STRING_POOL_SIZE 256
 #endif
 
 #ifndef MJS_OBJ_POOL_SIZE
@@ -54,6 +54,7 @@ extern "C" {
 #include <stdint.h>
 #else
 typedef int bool;
+enum { false = 0, true = 1 };
 typedef long intptr_t;
 typedef __int64 int64_t;
 typedef unsigned __int64 uint64_t;
@@ -210,7 +211,6 @@ static val_t vm_err(struct vm *vm, const char *fmt, ...) {
   va_start(ap, fmt);
   vsnprintf(vm->error_message, sizeof(vm->error_message), fmt, ap);
   va_end(ap);
-  // fprintf(stderr, "JSERROR: %s\n", vm->error_message);
   // LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
   return MJS_ERROR;
 }
@@ -244,6 +244,7 @@ static const char *mjs_typeof(val_t v) {
   return names[mjs_type(v)];
 }
 
+static struct prop *firstprop(struct vm *vm, val_t obj);
 const char *tostr(struct vm *vm, val_t v) {
   static char buf[64];
   mjs_type_t t = mjs_type(v);
@@ -270,6 +271,17 @@ const char *tostr(struct vm *vm, val_t v) {
     case MJS_TYPE_ERROR:
       snprintf(buf, sizeof(buf), "ERROR: %s", vm->error_message);
       break;
+    case MJS_TYPE_OBJECT: {
+      int n = snprintf(buf, sizeof(buf), "obj(");
+      struct prop *prop = firstprop(vm, v);
+      while (prop != NULL) {
+        char *key = mjs_to_str(vm, prop->key, NULL);
+        n += snprintf(buf + n, sizeof(buf) - n, "%s%s", n > 4 ? "," : "", key);
+        prop = prop->next == INVALID_INDEX ? NULL : &vm->props[prop->next];
+      }
+      n += snprintf(buf + n, sizeof(buf) - n, ")");
+      break;
+    }
     default:
       snprintf(buf, sizeof(buf), "%s", mjs_typeof(v));
       break;
@@ -292,7 +304,7 @@ static void vm_dump(const struct vm *vm) {
   putchar('\n');
   printf("[VM] %8s: ", "cfuncs");
   for (i = 0; i < ARRSIZE(vm->cfuncs); i++) {
-    putchar(vm->cfuncs[i].fp ? 'v' : '-');
+    putchar(vm->cfuncs[i].fn ? 'v' : '-');
   }
   putchar('\n');
   printf("[VM] %8s: %d/%d\n", "strings", vm->stringbuf_len,
@@ -309,6 +321,21 @@ static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 static void abandon(struct vm *vm, val_t v) {
   mjs_type_t t = mjs_type(v);
   LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
+
+  if (t != MJS_TYPE_OBJECT && t != MJS_TYPE_STRING) return;
+  {
+    ind_t j;
+    // If this value is still referenced, do nothing
+    for (j = 0; j < ARRSIZE(vm->props); j++) {
+      struct prop *prop = &vm->props[j];
+      if (prop->flags == 0) continue;
+      if (v == prop->key || v == prop->val) return;
+    }
+    // Look at the data stack too
+    for (j = 0; j < vm->sp; j++)
+      if (v == vm->data_stack[j]) return;
+  }
+
   // vm_dump(vm);
   if (t == MJS_TYPE_OBJECT) {
     ind_t i, obj_index = (ind_t) VAL_PAYLOAD(v);
@@ -324,21 +351,13 @@ static void abandon(struct vm *vm, val_t v) {
       i = prop->next;  // Point to the next property
     }
   } else if (t == MJS_TYPE_STRING) {
-    ind_t k, j, i = (ind_t) VAL_PAYLOAD(v);    // String begin
-    ind_t len = (ind_t) vm->stringbuf[i] + 2;  // String length
+    ind_t k, j, i = (ind_t) VAL_PAYLOAD(v);     // String begin
+    ind_t len = (ind_t)(vm->stringbuf[i] + 2);  // String length
 
-    // If this string is still referenced, do nothing
-    for (j = 0; j < ARRSIZE(vm->props); j++) {
-      struct prop *prop = &vm->props[j];
-      if (prop->flags == 0) continue;
-      if (v == prop->key || v == prop->val) return;
-    }
-    // Look at the data stack too
-    for (j = 0; j < vm->sp; j++)
-      if (v == vm->data_stack[j]) return;
-
+    // printf("abandoning %d %d [%s]\n", (int) i, (int) len, tostr(vm, v));
     // Ok, not referenced, deallocate a string
     if (i + len == sizeof(vm->stringbuf) || i + len == vm->stringbuf_len) {
+      // printf("shrink [%s]\n", tostr(vm, v));
       vm->stringbuf[i] = 0;   // If we're the last string,
       vm->stringbuf_len = i;  // shrink the buf immediately
     } else {
@@ -347,7 +366,7 @@ static void abandon(struct vm *vm, val_t v) {
       // printf("--> RELOC, %hu %hu\n", vm->stringbuf_len, len);
       memmove(&vm->stringbuf[i], &vm->stringbuf[i + len], len);
       assert(vm->stringbuf_len >= len);
-      vm->stringbuf_len -= len;
+      vm->stringbuf_len = (ind_t)(vm->stringbuf_len - len);
       for (j = 0; j < ARRSIZE(vm->props); j++) {
         struct prop *prop = &vm->props[j];
         if (prop->flags != 0) continue;
@@ -359,6 +378,7 @@ static void abandon(struct vm *vm, val_t v) {
         }
       }
     }
+    // printf("sbuflen %d\n", (int) vm->stringbuf_len);
   }
 }
 
@@ -386,6 +406,7 @@ static val_t vm_drop(struct vm *vm) {
 
 static val_t mk_str(struct vm *vm, const char *p, int n) {
   len_t len = n < 0 ? (len_t) strlen(p) : (len_t) n;
+  // printf("%s [%.*s], %d\n", __func__, n, p, (int) vm->stringbuf_len);
   if (len > 0xff) {
     return vm_err(vm, "string is too long");
   } else if (len + 2 > sizeof(vm->stringbuf) - vm->stringbuf_len) {
@@ -394,7 +415,7 @@ static val_t mk_str(struct vm *vm, const char *p, int n) {
     val_t v = MK_VAL(MJS_TYPE_STRING, vm->stringbuf_len);
     vm->stringbuf[vm->stringbuf_len++] = (uint8_t)(len & 0xff);  // save length
     if (p) memmove(&vm->stringbuf[vm->stringbuf_len], p, len);   // copy data
-    vm->stringbuf_len += (ind_t) len;
+    vm->stringbuf_len = (ind_t)(vm->stringbuf_len + len);
     vm->stringbuf[vm->stringbuf_len++] = 0;  // nul-terminate
     return v;
   }
@@ -471,21 +492,21 @@ static val_t delete_scope(struct vm *vm) {
   }
 }
 
+static struct prop *firstprop(struct vm *vm, val_t obj) {
+  ind_t obj_index = (ind_t) VAL_PAYLOAD(obj);
+  struct obj *o = &vm->objs[obj_index];
+  if (obj_index >= ARRSIZE(vm->objs)) return NULL;
+  return o->props == INVALID_INDEX ? NULL : &vm->props[o->props];
+}
+
 // Lookup property in a given object
 static val_t *findprop(struct vm *vm, val_t obj, const char *ptr, len_t len) {
-  ind_t i, obj_index = (ind_t) VAL_PAYLOAD(obj);
-  struct obj *o = &vm->objs[obj_index];
-  if (obj_index >= ARRSIZE(vm->objs)) {
-    vm_err(vm, "corrupt obj, index %x", obj_index);
-    return NULL;
-  }
-  i = o->props;
-  while (i != INVALID_INDEX) {
-    struct prop *p = &vm->props[i];
+  struct prop *prop = firstprop(vm, obj);
+  while (prop != NULL) {
     len_t n = 0;
-    char *key = mjs_to_str(vm, p->key, &n);
-    if (n == len && memcmp(key, ptr, n) == 0) return &vm->props[i].val;
-    i = p->next;
+    char *key = mjs_to_str(vm, prop->key, &n);
+    if (n == len && memcmp(key, ptr, n) == 0) return &prop->val;
+    prop = prop->next == INVALID_INDEX ? NULL : &vm->props[prop->next];
   }
   return NULL;
 }
@@ -496,6 +517,8 @@ static val_t *lookup(struct vm *vm, const char *ptr, len_t len) {
   for (i = vm->csp; i > 0; i--) {
     val_t scope = vm->call_stack[i - 1];
     val_t *prop = findprop(vm, scope, ptr, len);
+    // printf(" lookup scope %d %s [%.*s] %p\n", (int) i, tostr(vm, scope),
+    //(int) len, ptr, prop);
     if (prop != NULL) return prop;
   }
   return NULL;
@@ -507,12 +530,6 @@ static val_t lookup_and_push(struct vm *vm, const char *ptr, len_t len) {
   if (vp != NULL) return vm_push(vm, *vp);
   return vm_err(mjs, "[%.*s] undefined", len, ptr);
 }
-
-// static val_t *vm_get(struct vm *vm, val_t obj, val_t key) {
-//   len_t len;
-//   char *ptr = mjs_to_str(vm, key, &len);
-//   return findprop(vm, obj, ptr, len);
-// }
 
 val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_TYPE_OBJECT) {
@@ -894,7 +911,7 @@ static val_t do_op(struct parser *p, int op) {
       break;
     case '~':
       if (mjs_type(top[0]) != MJS_TYPE_NUMBER) return vm_err(p->vm, "noo");
-      top[0] = tov(~(long) tof(top[0]));
+      top[0] = tov((float) (~(long) tof(top[0])));
       break;
     case TOK_UNARY_PLUS:
       break;
@@ -1024,6 +1041,7 @@ static val_t parse_object_literal(struct parser *p) {
       return vm_err(p->vm, "parsing obj: expecting '}'");
     }
   }
+  // printf("mko %s\n", tostr(p->vm, obj));
   return res;
 }
 
@@ -1101,7 +1119,10 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
 
 static void setarg(struct parser *p, val_t scope, val_t val) {
   val_t key = mk_str(p->vm, p->tok.ptr, p->tok.len);
-  mjs_set(p->vm, scope, key, val);
+  if (mjs_type(key) == MJS_TYPE_STRING) mjs_set(p->vm, scope, key, val);
+  // printf("  setarg: key %s\n", tostr(p->vm, key));
+  // printf("  setarg: val %s\n", tostr(p->vm, val));
+  // printf("  setarg scope: %s\n", tostr(p->vm, scope));
   if (lookahead(p) == ',') pnext(p);
   pnext(p);
 }
@@ -1126,7 +1147,7 @@ static val_t call_js_function(struct parser *p, val_t f) {
   pnext(&p2);
   pnext(&p2);  // Now p2.tok points either to the first argument, or to the ')'
 
-  // Parse parameters, append them to the scope
+  // Parse parameters, populate the scope as local variables
   while (p->tok.tok != ')') {
     // Evaluate next argument - pushed to the data_stack
     TRY(parse_expr(p));
@@ -1136,6 +1157,7 @@ static val_t call_js_function(struct parser *p, val_t f) {
     vm_drop(p->vm);  // Drop argument value from the data_stack
     LOG((DBGPREFIX "%s: P sp %d\n", __func__, p->vm->sp));
   }
+  // printf(" local scope: %s\n", tostr(p->vm, scope));
   while (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, MJS_UNDEFINED);
   while (p2.tok.tok != '{') pnext(&p2);  // Skip to the function body
   res = parse_block(&p2, 0);             // Execute function body
@@ -1458,7 +1480,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
             return -1;
         }
       }
-      res->v.i = (uint64_t) r;
+      res->v.i = (ffi_word_t) r;
     } break;
     case FFI_CTYPE_BOOL: {
       ffi_word_t r;
@@ -1577,7 +1599,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
             return -1;
         }
       }
-      res->v.i = (uint64_t) r;
+      res->v.i = (ffi_word_t) r;
     } break;
     case FFI_CTYPE_DOUBLE: {
       double r;
@@ -1713,7 +1735,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
             return -1;
         }
       }
-      res->v.f = r;
+      res->v.f = (float) r;
     } break;
   }
 
@@ -1749,7 +1771,7 @@ static ffi_word_t fficb(struct fficbparam *cbp, union ffi_val *args) {
   call_js_function(&p2, cbp->jsfunc);
   res = *vm_top(cbp->p->vm);
   // printf("js cb res: %s\n", tostr(cbp->p->vm, res));
-  return tof(res);
+  return (ffi_word_t) tof(res);
 }
 
 static void ffiinitcbargs(union ffi_val *args, ffi_word_t w1, ffi_word_t w2,
@@ -1855,7 +1877,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
 			case '[': ffi_set_ptr(arg, (void *) setfficb(p, av, &cbp, cf->decl, &i)); break;
 			case 'u': ffi_set_ptr(arg, &cbp); break;
 			case 's': ffi_set_ptr(arg, mjs_to_str(p->vm, av, 0)); break;
-			case 'b': ffi_set_bool(arg, tof(av)); break;
+			case 'b': ffi_set_bool(arg, (int) tof(av)); break;
 			case 'f': ffi_set_float(arg, tof(av)); break;
 			case 'F': ffi_set_double(arg, (double) tof(av)); break;
 			default: ffi_set_word(arg, (int) tof(av)); break;
@@ -1917,8 +1939,24 @@ static val_t parse_call_dot_mem(struct parser *p, int prev_op) {
       EXPECT(p, ')');
       pnext(p);
     } else if (p->tok.tok == '.') {
+      val_t v = *vm_top(p->vm);
       pnext(p);
-      TRY(parse_call_dot_mem(p, '.'));
+      if (!p->noexec) {
+        if (p->tok.len == 6 && memcmp(p->tok.ptr, "length", 6) == 0 &&
+            mjs_type(v) == MJS_TYPE_STRING) {
+          len_t len;
+          mjs_to_str(p->vm, v, &len);
+          vm_drop(p->vm);
+          res = vm_push(p->vm, tov(len));
+        } else if (mjs_type(v) != MJS_TYPE_OBJECT) {
+          res = vm_push(p->vm, vm_err(p->vm, "lookup in non-obj"));
+        } else {
+          val_t *prop = findprop(p->vm, v, p->tok.ptr, p->tok.len);
+          vm_drop(p->vm);
+          res = vm_push(p->vm, prop == NULL ? MJS_UNDEFINED : *prop);
+        }
+      }
+      pnext(p);
     }
   }
   (void) prev_op;
@@ -2230,3 +2268,4 @@ val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
 }
 
 #endif  // MJS_H
+
