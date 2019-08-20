@@ -3,6 +3,12 @@ DBG ?=
 #MFLAGS += -DMJS_DEBUG
 TFLAGS += -DMJS_PROP_POOL_SIZE=30 -DMJS_STRING_POOL_SIZE=512
 CFLAGS += -W -Wall -Werror -Wstrict-overflow -fno-strict-aliasing -Os -g
+GCOV ?= echo
+
+ifeq ($(CC),clang)
+	CFLAGS += -coverage
+	GCOV = gcov
+endif
 
 all: $(PROG) test cpptest vc98 test98
 .PHONY: test $(PROG)
@@ -12,7 +18,8 @@ $(PROG): mjs.c example.c
 
 test: unit_test.c mjs.c
 	$(CC) -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS)
-	$(DBG) ./$@
+	@$(DBG) ./$@
+	@$(GCOV) unit_test.c
 
 cpptest:
 	$(CXX) -x c++ -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS)
@@ -29,4 +36,4 @@ test98: unit_test.c mjs.c
 
 
 clean:
-	rm -rf $(PROG) *test *.exe *.obj *.dSYM example
+	rm -rf $(PROG) *test *.exe *.obj *.dSYM example *.gc*

@@ -2,6 +2,8 @@
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
+[![Code Coverage](https://codecov.io/gh/cpq/mjs3/branch/master/graph/badge.svg)](https://codecov.io/gh/cpq/mjs3)
+
 
 mJS is a single-source JavaScript engine for microcontrollers.
 
