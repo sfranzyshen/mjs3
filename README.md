@@ -1,9 +1,9 @@
-# mJS - a JS engine for Arduino systems
+# mJS3 - a JS engine for Arduino systems
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 [![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
 
-mJS is a single-source JavaScript engine for Arduino microcontrollers.
+mJS3 is a single-source JavaScript engine for Arduino microcontrollers.
 
 ## Features
 
