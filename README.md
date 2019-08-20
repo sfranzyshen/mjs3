@@ -2,7 +2,7 @@
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
-mJS3 is a single-source JavaScript engine for Arduino microcontrollers.
+mJS3 is a single-source JavaScript engine for Arduino IDE microcontrollers.
 
 ## Install
 
@@ -28,7 +28,7 @@ mJS3 is a single-source JavaScript engine for Arduino microcontrollers.
 - mJS VM executes JS source directly, no AST/bytecode is generated
 - Simple FFI API to inject existing C functions into JS
 
-## Example - blinky in JavaScript on Arduino Platform (ESP8266)
+## Example - blinky in JavaScript on Arduino Platform
 
 ```c++
 #define MJS_STRING_POOL_SIZE 200      // Buffer for all strings
