@@ -1,14 +1,14 @@
-# mJS3 - a JS engine for Arduino IDE systems
+# mJS3 - a JS engine for embedded Arduino IDE systems
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 
-mJS3 is a single-source JavaScript engine for Arduino IDE microcontrollers.
+mJS3 is a single-source-file JavaScript engine for Arduino IDE microcontrollers.
 
-## Install
+## Demo Install
 
-- Download (Clone) this repository and copy the folder (as is no need to rename it) into your user Arduino Folder (C:\Users\USER\Documents\Arduino\mjs3-Arduino)
-- Load the sketch using the menu (File->Sketchbook->mjs3-Arduino)
-- Build and Upload
+- Download (Clone) this github repository and copy the folder (as is no need to rename it) into your user Arduino Folder (C:\Users\USER\Documents\Arduino\mjs3-Arduino)
+- Load the sketch using the Arduino IDE menu (File->Sketchbook->mjs3-Arduino)
+- Build and Upload (*note: currently does not build on AVR platforms)
 
 ## Features
 
