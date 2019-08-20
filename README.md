@@ -1,9 +1,14 @@
 # mJS3 - a JS engine for Arduino systems
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
-[![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
 
 mJS3 is a single-source JavaScript engine for Arduino microcontrollers.
+
+## Install
+
+- Download (Clone) this repository and copy the folder (as is no need to rename it) into your user Arduino Folder (C:\Users\USER\Documents\Arduino\mjs3-Arduino)
+- Load the sketch using the menu (File->Sketchbook->mjs3-Arduino)
+- Build and Upload
 
 ## Features
 
@@ -25,7 +30,7 @@ mJS3 is a single-source JavaScript engine for Arduino microcontrollers.
 
 ## Example - blinky in JavaScript on Arduino Platform (ESP8266)
 
-```
+```c++
 #define MJS_STRING_POOL_SIZE 200      // Buffer for all strings
 #include "mjs3-Arduino.c"                     
 
