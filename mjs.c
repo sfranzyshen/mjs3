@@ -83,24 +83,24 @@ typedef uint16_t ind_t;
 typedef uint32_t tok_t;
 #define INVALID_INDEX ((ind_t) ~0)
 
-struct mjs *mjs_create(void);            // Create instance
-void mjs_destroy(struct mjs *);          // Destroy instance
-val_t mjs_get_global(struct mjs *);      // Get global namespace object
-val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
-val_t mjs_set(struct vm *, val_t obj, val_t key, val_t val);  // Set attribute
-const char *mjs_stringify(struct mjs *, val_t v);             // Stringify value
-unsigned long mjs_size(void);                          // Get VM size
+static struct mjs *mjs_create(void);            // Create instance
+static void mjs_destroy(struct mjs *);          // Destroy instance
+static val_t mjs_get_global(struct mjs *);      // Get global namespace object
+static val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
+static val_t mjs_set(struct vm *, val_t obj, val_t key, val_t val);  // Set attribute
+static const char *mjs_stringify(struct mjs *, val_t v);             // Stringify value
+static unsigned long mjs_size(void);                          // Get VM size
 
 // Converting from C type to val_t
 // Use MJS_UNDEFINED, MJS_NULL, MJS_TRUE, MJS_FALSE for other scalar types
-val_t mjs_mk_obj(struct mjs *);
-val_t mjs_mk_str(struct mjs *, const char *, int len);
-val_t mjs_mk_num(float value);
-val_t mjs_mk_js_func(struct mjs *, const char *, int len);
+static val_t mjs_mk_obj(struct mjs *);
+static val_t mjs_mk_str(struct mjs *, const char *, int len);
+static val_t mjs_mk_num(float value);
+static val_t mjs_mk_js_func(struct mjs *, const char *, int len);
 
 // Converting from val_t to C/C++ types
-float mjs_to_float(val_t v);                         // Unpack number
-char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
+static float mjs_to_float(val_t v);                         // Unpack number
+static char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
 
 #define mjs_to_float(v) tof(v)
 #define mjs_mk_str(vm, s, n) mk_str(vm, s, n)
