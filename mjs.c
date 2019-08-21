@@ -14,6 +14,7 @@
 // Alternatively, you can license this software under a commercial
 // license, please contact us at https://mdash.net/home/company.html
 
+
 #ifndef MJS_DATA_STACK_SIZE
 #define MJS_DATA_STACK_SIZE 10
 #endif
