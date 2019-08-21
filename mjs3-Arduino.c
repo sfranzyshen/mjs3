@@ -14,6 +14,7 @@
 // Alternatively, you can license this software under a commercial
 // license, please contact us at https://mdash.net/home/company.html
 
+
 #ifndef MJS_DATA_STACK_SIZE
 #define MJS_DATA_STACK_SIZE 10
 #endif
@@ -85,21 +86,21 @@ typedef uint32_t tok_t;
 
 static struct mjs *mjs_create(void);            // Create instance
 static void mjs_destroy(struct mjs *);          // Destroy instance
-static val_t mjs_get_global(struct mjs *);      // Get global namespace object
+val_t mjs_get_global(struct mjs *);      // Get global namespace object
 static val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
 static val_t mjs_set(struct vm *, val_t obj, val_t key, val_t val);  // Set attribute
-static const char *mjs_stringify(struct mjs *, val_t v);             // Stringify value
-static unsigned long mjs_size(void);                          // Get VM size
+const char *mjs_stringify(struct mjs *, val_t v);             // Stringify value
+unsigned long mjs_size(void);                          // Get VM size
 
 // Converting from C type to val_t
 // Use MJS_UNDEFINED, MJS_NULL, MJS_TRUE, MJS_FALSE for other scalar types
-static val_t mjs_mk_obj(struct mjs *);
-static val_t mjs_mk_str(struct mjs *, const char *, int len);
-static val_t mjs_mk_num(float value);
-static val_t mjs_mk_js_func(struct mjs *, const char *, int len);
+val_t mjs_mk_obj(struct mjs *);
+val_t mjs_mk_str(struct mjs *, const char *, int len);
+val_t mjs_mk_num(float value);
+val_t mjs_mk_js_func(struct mjs *, const char *, int len);
 
 // Converting from val_t to C/C++ types
-static float mjs_to_float(val_t v);                         // Unpack number
+float mjs_to_float(val_t v);                         // Unpack number
 static char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
 
 #define mjs_to_float(v) tof(v)
@@ -2268,6 +2269,5 @@ static val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
 }
 
 #endif  // MJS_H
-
 
 
