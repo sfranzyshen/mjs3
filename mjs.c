@@ -83,11 +83,11 @@ typedef uint16_t ind_t;
 typedef uint32_t tok_t;
 #define INVALID_INDEX ((ind_t) ~0)
 
-static struct mjs *mjs_create(void);            // Create instance
-static void mjs_destroy(struct mjs *);          // Destroy instance
+struct mjs *mjs_create(void);            // Create instance
+void mjs_destroy(struct mjs *);          // Destroy instance
 val_t mjs_get_global(struct mjs *);      // Get global namespace object
-static val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
-static val_t mjs_set(struct vm *, val_t obj, val_t key, val_t val);  // Set attribute
+val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
+val_t mjs_set(struct vm *, val_t obj, val_t key, val_t val);  // Set attribute
 const char *mjs_stringify(struct mjs *, val_t v);             // Stringify value
 unsigned long mjs_size(void);                          // Get VM size
 
@@ -100,7 +100,7 @@ val_t mjs_mk_js_func(struct mjs *, const char *, int len);
 
 // Converting from val_t to C/C++ types
 float mjs_to_float(val_t v);                         // Unpack number
-static char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
+char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
 
 #define mjs_to_float(v) tof(v)
 #define mjs_mk_str(vm, s, n) mk_str(vm, s, n)
@@ -421,7 +421,7 @@ static val_t mk_str(struct vm *vm, const char *p, int n) {
   }
 }
 
-char *mjs_to_str(struct vm *vm, val_t v, len_t *len) {
+static char *mjs_to_str(struct vm *vm, val_t v, len_t *len) {
   uint8_t *p = vm->stringbuf + VAL_PAYLOAD(v);
   if (len != NULL) *len = p[0];
   return (char *) p + 1;
@@ -531,7 +531,7 @@ static val_t lookup_and_push(struct vm *vm, const char *ptr, len_t len) {
   return vm_err(mjs, "[%.*s] undefined", len, ptr);
 }
 
-val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
+static val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_TYPE_OBJECT) {
     len_t len;
     const char *ptr = mjs_to_str(vm, key, &len);
@@ -2228,7 +2228,7 @@ static val_t parse_statement_list(struct parser *p, tok_t endtok) {
 
 /////////////////////////////// EXTERNAL API /////////////////////////////////
 
-struct vm *mjs_create(void) {
+static struct vm *mjs_create(void) {
   struct vm *vm = (struct mjs *) calloc(1, sizeof(*vm));
   vm->objs[0].flags = OBJ_ALLOCATED;
   vm->objs[0].props = INVALID_INDEX;
@@ -2238,9 +2238,9 @@ struct vm *mjs_create(void) {
   return vm;
 };
 
-void mjs_destroy(struct vm *vm) { free(vm); }
+static void mjs_destroy(struct vm *vm) { free(vm); }
 
-val_t mjs_eval(struct vm *vm, const char *buf, int len) {
+static val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   struct parser p = mk_parser(vm, buf, len > 0 ? len : (int) strlen(buf));
   val_t v = MJS_ERROR;
   vm->error_message[0] = '\0';
@@ -2252,7 +2252,7 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   return v;
 }
 
-val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *decl) {
+static val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *decl) {
   val_t v = mk_cfunc(vm);
   struct cfunc *cfunc = &vm->cfuncs[VAL_PAYLOAD(v)];
   if (v == MJS_ERROR) return v;
@@ -2262,7 +2262,7 @@ val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *decl) {
   return v;
 }
 
-val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
+static val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
   val_t v = mjs_get_global(vm);
   return mjs_set(mjs, v, mjs_mk_str(vm, p, -1), mjs_mk_c_func(vm, f, s));
 }
