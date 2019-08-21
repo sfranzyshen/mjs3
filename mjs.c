@@ -2050,11 +2050,16 @@ static val_t parse_ternary(struct parser *p, int prev_op) {
   TRY(parse_logical_or(p, TOK_EOF));
   if (prev_op != TOK_EOF) do_op(p, prev_op);
   if (p->tok.tok == '?') {
+    int old_noexec = p->noexec, ok = is_true(p->vm, *vm_top(p->vm));
+    if (!old_noexec) vm_drop(p->vm);
     pnext(p);
+    if (!old_noexec) p->noexec = !ok;
     TRY(parse_ternary(p, TOK_EOF));
     EXPECT(p, ':');
     pnext(p);
+    if (!old_noexec) p->noexec = ok;
     TRY(parse_ternary(p, TOK_EOF));
+    p->noexec = old_noexec;
   }
   return res;
 }

@@ -16,7 +16,7 @@ all: $(PROG) test cpptest vc98 test98
 $(PROG): mjs.c example.c
 	$(CC) -o $@ example.c -DNDEBUG $(CFLAGS) $(MFLAGS)
 
-test: unit_test.c mjs.c
+test: clean unit_test.c mjs.c
 	$(CC) -o $@ unit_test.c $(CFLAGS) $(MFLAGS) $(TFLAGS)
 	@$(DBG) ./$@
 	-@$(GCOV) unit_test.c

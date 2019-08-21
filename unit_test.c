@@ -120,6 +120,10 @@ static void test_expr(void) {
   assert(numexpr(mjs, "2 * (3 + 4)", 14));
   assert(numexpr(mjs, "2 * (3 + 4 / 2 * 3)", 18));
 
+  CHECK_NUMERIC("false ? 4 : 5;", 5);
+  CHECK_NUMERIC("false ? 4 : '' ? 6 : 7;", 7);
+  CHECK_NUMERIC("77 ? 4 : '' ? 6 : 7;", 4);
+
   // ASSERT_EXEC_OK(mjs_exec(mjs, "NaN", &res));
   // ASSERT_EQ(!!isnan(mjs_get_double(mjs, res)), 1);
 
