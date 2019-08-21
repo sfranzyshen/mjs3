@@ -7,8 +7,9 @@
 
 #define CHECK_NUMERIC(x, y) assert(numexpr(mjs, (x), (y)))
 
-static bool check_num(mjs_val_t v, float expected) {
+static bool check_num(struct mjs *mjs, mjs_val_t v, float expected) {
   // printf("%s: %g %g\n", __func__, tof(v), expected);
+  if (mjs_type(v) == MJS_TYPE_ERROR) printf("ERROR: %s\n", mjs->error_message);
   return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_to_float(v) - expected) < 0.0001;
   // return res;
@@ -22,7 +23,7 @@ static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
 }
 
 static int numexpr(struct mjs *mjs, const char *code, float expected) {
-  return check_num(mjs_eval(mjs, code, strlen(code)), expected);
+  return check_num(mjs, mjs_eval(mjs, code, strlen(code)), expected);
 }
 
 static int strexpr(struct mjs *mjs, const char *code, const char *expected) {
@@ -271,21 +272,51 @@ static int callcb(int (*cb)(int, int, void *), void *arg) {
   return cb(2, 3, arg);
 }
 
+static void jslog(const char *s) {
+  printf("%s\n", s);
+}
+
+struct foo {
+  int n;
+  char x;
+  char *data;
+  int len;
+};
+
+static int cb1(int (*cb)(struct foo *, void *), void *arg) {
+  struct foo foo = {7, 'L', "some data", 4};
+  return cb(&foo, arg);
+}
+
 static void test_ffi(void) {
   struct mjs *mjs = mjs_create();
+
+  mjs_ffi(mjs, "log", (cfn_t) jslog, "vs");
+
+  mjs_ffi(mjs, "f1", (cfn_t) cb1, "i[ipu]u");
+  // assert(numexpr(mjs, "f1(function(a,b){ }, 0);", 5));
+
   mjs_ffi(mjs, "pi", (cfn_t) pi, "f");
-  mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
-  mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
-  mjs_ffi(mjs, "mul", (cfn_t) mul, "FFF");
-  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "i[iiiu]u");
-  assert(numexpr(mjs, "sub(1.17,3.12);", -1.95));
   assert(numexpr(mjs, "pi() * 2;", 6.2831852));
+
+  mjs_ffi(mjs, "sub", (cfn_t) sub, "fff");
+  assert(numexpr(mjs, "sub(1.17,3.12);", -1.95));
   assert(numexpr(mjs, "sub(0, 0xff);", -255));
   assert(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
   assert(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
+
+  mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf");
   assert(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
+
+  mjs_ffi(mjs, "mul", (cfn_t) mul, "FFF");
   assert(numexpr(mjs, "mul(1.323, 7.321)", 9.685683));
+
+  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "i[iiiu]u");
   assert(numexpr(mjs, "ccb(function(a,b,c){return a+b;}, 123);", 5));
+
+  mjs_ffi(mjs, "strlen", (cfn_t) strlen, "is");
+  assert(numexpr(mjs, "strlen('abc')", 3));
+
   mjs_destroy(mjs);
 }
 

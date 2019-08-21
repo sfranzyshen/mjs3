@@ -35,7 +35,7 @@
 #endif
 
 #ifndef MJS_CFUNC_POOL_SIZE
-#define MJS_CFUNC_POOL_SIZE 5
+#define MJS_CFUNC_POOL_SIZE 20
 #endif
 
 #ifndef MJS_ERROR_MESSAGE_SIZE
@@ -1892,6 +1892,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
 		case 's': v = mk_str(p->vm, (char *) args[0].v.i, -1); break;
 		case 'f': v = tov(args[0].v.f); break;
 		case 'F': v = tov((float) args[0].v.d); break;
+		case 'v': v = MJS_UNDEFINED; break;
 		default: v = tov((float) args[0].v.i); break;
 	}
   // clang-format on
