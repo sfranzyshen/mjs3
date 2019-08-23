@@ -27,15 +27,15 @@
 #endif
 
 #ifndef MJS_OBJ_POOL_SIZE
-#define MJS_OBJ_POOL_SIZE 5
+#define MJS_OBJ_POOL_SIZE 20
 #endif
 
 #ifndef MJS_PROP_POOL_SIZE
-#define MJS_PROP_POOL_SIZE 10
+#define MJS_PROP_POOL_SIZE 30
 #endif
 
 #ifndef MJS_CFUNC_POOL_SIZE
-#define MJS_CFUNC_POOL_SIZE 20
+#define MJS_CFUNC_POOL_SIZE 10
 #endif
 
 #ifndef MJS_ERROR_MESSAGE_SIZE
@@ -153,7 +153,7 @@ char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
 typedef enum {
   MJS_TYPE_UNDEFINED, MJS_TYPE_NULL, MJS_TYPE_TRUE, MJS_TYPE_FALSE,
   MJS_TYPE_STRING, MJS_TYPE_OBJECT, MJS_TYPE_ARRAY, MJS_TYPE_FUNCTION,
-  MJS_TYPE_NUMBER, MJS_TYPE_ERROR, MJS_TYPE_C_FUNCTION,
+  MJS_TYPE_NUMBER, MJS_TYPE_ERROR, MJS_TYPE_C_FUNCTION, MJS_TYPE_C_POINTER,
 } mjs_type_t;
 // clang-format on
 
@@ -239,70 +239,76 @@ static float tof(val_t v) {
 static const char *mjs_typeof(val_t v) {
   const char *names[] = {"undefined", "null",   "true",   "false",
                          "string",    "object", "object", "function",
-                         "number",    "error",  "cfunc",  "?",
+                         "number",    "error",  "cfunc",  "cpointer",
                          "?",         "?",      "?",      "?"};
   return names[mjs_type(v)];
 }
 
 static struct prop *firstprop(struct vm *vm, val_t obj);
-const char *tostr(struct vm *vm, val_t v) {
-  static char buf[64];
+static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
   mjs_type_t t = mjs_type(v);
+  if (len <= 0 || buf == NULL) return buf;
   switch (t) {
     case MJS_TYPE_NUMBER: {
       double f = tof(v), iv;
       if (modf(f, &iv) == 0) {
-        snprintf(buf, sizeof(buf), "%ld", (long) f);
+        snprintf(buf, len, "%ld", (long) f);
       } else {
-        snprintf(buf, sizeof(buf), "%g", f);
+        snprintf(buf, len, "%g", f);
       }
       break;
     }
     case MJS_TYPE_STRING:
     case MJS_TYPE_FUNCTION: {
-      len_t len;
-      const char *ptr = mjs_to_str(vm, v, &len);
-      snprintf(buf, sizeof(buf), "%.*s", len, ptr);
+      len_t n;
+      const char *ptr = mjs_to_str(vm, v, &n);
+      snprintf(buf, len, "%.*s", n, ptr);
       break;
     }
     case MJS_TYPE_C_FUNCTION:
-      snprintf(buf, sizeof(buf), "cfunc@%p", vm->cfuncs[VAL_PAYLOAD(v)].fn);
+      snprintf(buf, len, "cfunc@%p", vm->cfuncs[VAL_PAYLOAD(v)].fn);
       break;
     case MJS_TYPE_ERROR:
-      snprintf(buf, sizeof(buf), "ERROR: %s", vm->error_message);
+      snprintf(buf, len, "ERROR: %s", vm->error_message);
       break;
     case MJS_TYPE_OBJECT: {
-      int n = snprintf(buf, sizeof(buf), "obj(");
+      int n = snprintf(buf, len, "{");
       struct prop *prop = firstprop(vm, v);
       while (prop != NULL) {
         char *key = mjs_to_str(vm, prop->key, NULL);
-        n += snprintf(buf + n, sizeof(buf) - n, "%s%s", n > 4 ? "," : "", key);
+        n += snprintf(buf + n, len - n, "%s'%s':", n > 4 ? "," : "", key);
+        n += strlen(_tos(vm, prop->val, buf + n, len - n));
         prop = prop->next == INVALID_INDEX ? NULL : &vm->props[prop->next];
       }
-      n += snprintf(buf + n, sizeof(buf) - n, ")");
+      n += snprintf(buf + n, len - n, "}");
       break;
     }
     default:
-      snprintf(buf, sizeof(buf), "%s", mjs_typeof(v));
+      snprintf(buf, len, "[%s]", mjs_typeof(v));
       break;
   }
   return buf;
 }
 
+const char *tostr(struct vm *vm, val_t v) {
+  static char buf[64];
+  return _tos(vm, v, buf, sizeof(buf));
+}
+
 #ifdef MJS_DEBUG
 static void vm_dump(const struct vm *vm) {
   ind_t i;
-  printf("[VM] %8s: ", "objs");
+  printf("[VM] %8s[%4d]: ", "objs", (int) sizeof(vm->objs));
   for (i = 0; i < ARRSIZE(vm->objs); i++) {
     putchar(vm->objs[i].flags ? 'v' : '-');
   }
   putchar('\n');
-  printf("[VM] %8s: ", "props");
+  printf("[VM] %8s[%4d]: ", "props", (int) sizeof(vm->props));
   for (i = 0; i < ARRSIZE(vm->props); i++) {
     putchar(vm->props[i].flags ? 'v' : '-');
   }
   putchar('\n');
-  printf("[VM] %8s: ", "cfuncs");
+  printf("[VM] %8s[%4d]: ", "cfuncs", (int) sizeof(vm->cfuncs));
   for (i = 0; i < ARRSIZE(vm->cfuncs); i++) {
     putchar(vm->cfuncs[i].fn ? 'v' : '-');
   }
@@ -921,6 +927,10 @@ static val_t do_op(struct parser *p, int op) {
       // static tok_t s_unary_ops[] = {'!',        '~', DT('+', '+'), DT('-',
       // '-'),
       //                              TOK_TYPEOF, '-', '+',          TOK_EOF};
+    case TOK_TYPEOF:
+      top[0] = mk_str(p->vm, mjs_typeof(top[0]), -1);
+      break;
+#if 0
     case '=': {
       val_t obj = p->vm->call_stack[p->vm->csp - 1];
       val_t res = mjs_set(p->vm, obj, a, b);
@@ -929,6 +939,7 @@ static val_t do_op(struct parser *p, int op) {
       if (res == MJS_ERROR) return res;
       return vm_drop(p->vm);
     }
+#endif
     default:
       return vm_err(p->vm, "Unknown op: %c (%d)", op, op);
   }
@@ -1004,7 +1015,7 @@ static val_t parse_function(struct parser *p) {
   TRY(parse_block(p, 0));
   if (name_provided) TRY(do_op(p, '='));
   {
-    val_t f = mk_func(p->vm, tmp.ptr, p->tok.ptr - tmp.ptr + 1);
+    val_t f = mk_func(p->vm, tmp.ptr, (int) (p->tok.ptr - tmp.ptr + 1));
     TRY(f);
     res = vm_push(p->vm, f);
   }
@@ -1604,8 +1615,7 @@ static int ffi_call(cfn_t func, int nargs, struct ffi_arg *res,
     case FFI_CTYPE_DOUBLE: {
       double r;
       if (doubles == 0) {
-        /* No double args: we currently support up to 6 word-sized arguments
-         */
+        // No double args: we currently support up to 6 word-sized arguments
         if (nargs <= 4) {
           d4w_t f = (d4w_t) func;
           r = f(W(args[0]), W(args[1]), W(args[2]), W(args[3]));
@@ -1756,15 +1766,17 @@ static ffi_word_t fficb(struct fficbparam *cbp, union ffi_val *args) {
   val_t res;
   for (s = cbp->decl + 1; *s != '\0' && *s != ']'; s++) {
     // clang-format off
-    if (num_args > 0) n += snprintf(buf + n, sizeof(buf) - n, "%s", ",");
+    if (num_args > 0 && n < (int) sizeof(buf)) buf[n++] = ',';
     switch (*s) {
       case 'i': n += snprintf(buf + n, sizeof(buf) - n, "%d", (int) args[num_args].i); break;
+      case 'p': n += snprintf(buf + n, sizeof(buf) - n, "'%lx'", (unsigned long) args[num_args].i); break;
       default: n += snprintf(buf + n, sizeof(buf) - n, "null"); break;
     }
     // clang-format on
     num_args++;
   }
-  n += snprintf(buf + n, sizeof(buf) - n, "%s", ")");
+  if (n < (int) sizeof(buf)) buf[n++] = ')';
+  if (n < (int) sizeof(buf)) buf[n++] = '\0';
   // printf("js cb: %p '%s'\n", cbp, buf);
   p2 = mk_parser(cbp->p->vm, buf, n);
   pnext(&p2);
@@ -1843,6 +1855,15 @@ static w6w_t setfficb(struct parser *p, val_t jsfunc, struct fficbparam *cbp,
   return res;
 }
 
+static ffi_word_t toptr(struct mjs *vm, val_t v) {
+  ffi_word_t ret = 0;
+  if (mjs_type(v) == MJS_TYPE_STRING) {
+    const char *s = mjs_to_str(vm, v, 0);
+    sscanf(s, "%lx", &ret);
+  }
+  return ret;
+}
+
 static val_t call_c_function(struct parser *p, val_t f) {
   struct cfunc *cf = &p->vm->cfuncs[VAL_PAYLOAD(f)];
   val_t res = MJS_UNDEFINED, v = MJS_UNDEFINED, *top = vm_top(p->vm);
@@ -1864,7 +1885,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
 	//printf("--> cbp %p\n", &cbp);
 	switch (cf->decl[0]) {
 		case 'f': args[0].ctype = FFI_CTYPE_FLOAT; break;
-		case 'F': args[0].ctype = FFI_CTYPE_DOUBLE; break;
+		case 'd': args[0].ctype = FFI_CTYPE_DOUBLE; break;
 		case 'b': args[0].ctype = FFI_CTYPE_BOOL; break;
 		default: args[0].ctype = FFI_CTYPE_WORD; break;
 	}
@@ -1879,8 +1900,10 @@ static val_t call_c_function(struct parser *p, val_t f) {
 			case 's': ffi_set_ptr(arg, mjs_to_str(p->vm, av, 0)); break;
 			case 'b': ffi_set_bool(arg, (int) tof(av)); break;
 			case 'f': ffi_set_float(arg, tof(av)); break;
-			case 'F': ffi_set_double(arg, (double) tof(av)); break;
-			default: ffi_set_word(arg, (int) tof(av)); break;
+			case 'd': ffi_set_double(arg, (double) tof(av)); break;
+			case 'p': ffi_set_word(arg, toptr(p->vm, av)); break;
+			case 'i': ffi_set_word(arg, (int) tof(av)); break;
+			default: return  vm_err(p->vm, "bad ffi type '%c'", cf->decl[i]); break;
 		}
 		num_expected_args++;
 	}
@@ -1891,9 +1914,11 @@ static val_t call_c_function(struct parser *p, val_t f) {
 	switch (cf->decl[0]) {
 		case 's': v = mk_str(p->vm, (char *) args[0].v.i, -1); break;
 		case 'f': v = tov(args[0].v.f); break;
-		case 'F': v = tov((float) args[0].v.d); break;
+		case 'd': v = tov((float) args[0].v.d); break;
 		case 'v': v = MJS_UNDEFINED; break;
-		default: v = tov((float) args[0].v.i); break;
+		case 'b': v = args[0].v.i ? MJS_TRUE : MJS_FALSE; break;
+		case 'i': v = tov((float) args[0].v.i); break;
+		default: v = vm_err(p->vm, "bad ret type '%c'", cf->decl[0]); break;
 	}
   // clang-format on
         while (vm_top(p->vm) > top) vm_drop(p->vm);  // Abandon pushed args
@@ -1906,26 +1931,25 @@ static val_t parse_call_dot_mem(struct parser *p, int prev_op) {
   val_t res = MJS_TRUE;
   TRY(parse_literal(p, p->tok.tok));
   while (p->tok.tok == '.' || p->tok.tok == '(' || p->tok.tok == '[') {
+    // printf("%s: [%.*s]\n", __func__, p->tok.len, p->tok.ptr);
     if (p->tok.tok == '[') {
       tok_t prev_tok = p->prev_tok;
       pnext(p);
       TRY(parse_expr(p));
-      // emit_byte(p, OP_SWAP);
       EXPECT(p, ']');
       pnext(p);
       if (!findtok(s_assign_ops, p->tok.tok) &&
           !findtok(s_postfix_ops, p->tok.tok) &&
           !findtok(s_postfix_ops, prev_tok)) {
-        // emit_byte(p, OP_GET);
       }
     } else if (p->tok.tok == '(') {
       pnext(p);
+      // printf("%s: [%.*s] %d\n", __func__, p->tok.len, p->tok.ptr, p->noexec);
       if (p->noexec) {
         while (p->tok.tok != ')') {
           TRY(parse_expr(p));
           if (p->tok.tok == ',') pnext(p);
         }
-        return res;
       } else {
         val_t f = *vm_top(p->vm);
         mjs_type_t t = mjs_type(f);
@@ -2269,8 +2293,10 @@ val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *decl) {
 }
 
 val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
-  val_t v = mjs_get_global(vm);
-  return mjs_set(mjs, v, mjs_mk_str(vm, p, -1), mjs_mk_c_func(vm, f, s));
+  val_t obj = mjs_get_global(vm);
+  val_t val = mjs_mk_c_func(vm, f, s);
+  if (mjs_type(val) == MJS_TYPE_ERROR) return val;
+  return mjs_set(mjs, obj, mjs_mk_str(vm, p, -1), val);
 }
 
 #endif  // MJS_H

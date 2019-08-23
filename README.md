@@ -61,13 +61,13 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
-| Arrays            | `let arr = [1, 2, 'hi there']` |
 
 
 ## Unsupported standard operations and constructs
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
+| Arrays            | `let arr = [1, 2, 'hi there']` |
 | Loops/switch      | `for (...) { ... }`,`for (let k in obj) { ... }`, `do { ... } while (...)`, `switch (...) {...}` |
 | Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | var               | `var ...`  (note: use `let ...`) |
