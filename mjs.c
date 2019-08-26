@@ -276,7 +276,7 @@ static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
       struct prop *prop = firstprop(vm, v);
       while (prop != NULL) {
         char *key = mjs_to_str(vm, prop->key, NULL);
-        n += snprintf(buf + n, len - n, "%s'%s':", n > 4 ? "," : "", key);
+        n += snprintf(buf + n, len - n, "%s\"%s\":", n > 4 ? "," : "", key);
         n += strlen(_tos(vm, prop->val, buf + n, len - n));
         prop = prop->next == INVALID_INDEX ? NULL : &vm->props[prop->next];
       }
@@ -324,11 +324,13 @@ static void vm_dump(const struct vm *vm) {
 ////////////////////////////////////// VM ////////////////////////////////////
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 
+#if 0
 static void vm_swap(struct vm *vm) {
   val_t *top = vm_top(vm), v = top[-1];
   top[-1] = top[0];
   top[0] = v;
 }
+#endif
 
 static void abandon(struct vm *vm, val_t v) {
   ind_t j;
@@ -1897,9 +1899,11 @@ static val_t call_c_function(struct parser *p, val_t f) {
 			case '[': ffi_set_ptr(arg, (void *) setfficb(p, av, &cbp, cf->decl, &i)); break;
 			case 'u': ffi_set_ptr(arg, &cbp); break;
 			case 's': ffi_set_ptr(arg, mjs_to_str(p->vm, av, 0)); break;
+			case 'm': ffi_set_ptr(arg, p->vm); break;
 			case 'b': ffi_set_bool(arg, av == MJS_TRUE ? 1 : 0); break;
 			case 'f': ffi_set_float(arg, tof(av)); break;
 			case 'd': ffi_set_double(arg, (double) tof(av)); break;
+			case 'j': ffi_set_word(arg, (ffi_word_t) av); break;
 			case 'p': ffi_set_word(arg, toptr(p->vm, av)); break;
 			case 'i': ffi_set_word(arg, (int) tof(av)); break;
 			default: return  vm_err(p->vm, "bad ffi type '%c'", cf->decl[i]); break;
@@ -2261,10 +2265,12 @@ static val_t parse_statement_list(struct parser *p, tok_t endtok) {
   while (res != MJS_ERROR && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
     if (!p->noexec && p->vm->sp > 0) vm_drop(p->vm);
     res = parse_statement(p);
+#if 0
     if (!p->noexec && p->vm->sp > 1 && 0) {
       vm_swap(p->vm);
       vm_drop(p->vm);
     }
+#endif
     while (p->tok.tok == ';') pnext(p);
   }
   if (!p->noexec && p->vm->sp == 0) vm_push(p->vm, MJS_UNDEFINED);

@@ -353,7 +353,7 @@ static bool fbiiiii(int n1, int n2, int n3, int n4, int n5) {
 }
 
 static void jslog(const char *s) {
-  printf("%s\n", s);
+  (void) s;
 }
 
 struct foo {
@@ -472,6 +472,21 @@ static const char *test_notsupported(void) {
   return NULL;
 }
 
+static const char *test_comments(void) {
+  struct mjs *mjs = mjs_create();
+  CHECK_NUMERIC("// hi there!!\n/*\n\n fooo */\n\n   \t\t1", 1);
+  mjs_destroy(mjs);
+  return NULL;
+}
+
+static const char *test_stringify(void) {
+  struct mjs *mjs = mjs_create();
+  mjs_ffi(mjs, "str", (cfn_t) tostr, "smj");
+  // ASSERT(strexpr(mjs, "str(0,{a:1,b:3.14});", "{\"a\":1,\"b\":3.14}"));
+  mjs_destroy(mjs);
+  return NULL;
+}
+
 static const char *run_all_tests(void) {
   RUN_TEST(test_if);
   RUN_TEST(test_strings);
@@ -482,6 +497,8 @@ static const char *run_all_tests(void) {
   RUN_TEST(test_function);
   RUN_TEST(test_objects);
   RUN_TEST(test_notsupported);
+  RUN_TEST(test_comments);
+  RUN_TEST(test_stringify);
   return NULL;
 }
 
