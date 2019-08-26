@@ -1945,7 +1945,7 @@ static val_t parse_call_dot_mem(struct parser *p, int prev_op) {
             mjs_type(top[-1]) == MJS_TYPE_STRING) {
           len_t len, idx = tof(top[0]);
           const char *s = mjs_to_str(p->vm, top[-1], &len);
-          if (idx >= 0 && idx < len) v = mk_str(p->vm, s + idx, 1);
+          if (idx < len) v = mk_str(p->vm, s + idx, 1);
         } else {
           v = vm_err(p->vm, "pls index strings by num");
         }
