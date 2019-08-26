@@ -157,6 +157,9 @@ static const char *test_expr(void) {
   CHECK_NUMERIC("false ? 4 : '' ? 6 : 7;", 7);
   CHECK_NUMERIC("77 ? 4 : '' ? 6 : 7;", 4);
 
+  // TODO
+  // CHECK_NUMERIC("1, 2;", 2);
+
   // ASSERT_EXEC_OK(mjs_exec(mjs, "NaN", &res));
   // ASSERT_EQ(!!isnan(mjs_get_double(mjs, res)), 1);
 
@@ -260,6 +263,7 @@ static const char *test_if(void) {
   ASSERT(mjs_eval(mjs, "false", -1) == MJS_FALSE);
   ASSERT(mjs_eval(mjs, "null", -1) == MJS_NULL);
   ASSERT(mjs_eval(mjs, "undefined", -1) == MJS_UNDEFINED);
+  CHECK_NUMERIC("if (1) {2;}", 2);
   mjs_destroy(mjs);
   return NULL;
 }
@@ -267,6 +271,8 @@ static const char *test_if(void) {
 static const char *test_function(void) {
   ind_t len;
   struct mjs *mjs = mjs_create();
+  ASSERT(mjs_eval(mjs, "let a = function(x){ return; }; a();", -1) ==
+         MJS_UNDEFINED);
   CHECK_NUMERIC("let f = function(){ 1; }; 1;", 1);
   CHECK_NUMERIC("let fx = function(a){ return a; }; 1;", 1);
   CHECK_NUMERIC("let fy = function(a){ return a; }; fy(5);", 5);
@@ -393,6 +399,15 @@ static const char *test_ffi(void) {
   CHECK_NUMERIC("xx(true) ? 2 : 3;", 3);
   CHECK_NUMERIC("xx(false) ? 2 : 3;", 2);
 
+  {
+    struct mjs *vm = mjs_create();
+    ASSERT(mjs_ffi(vm, "a", (cfn_t) xx, "bl") == MJS_TRUE);
+    ASSERT(mjs_eval(mjs, "a(0);", -1) == MJS_ERROR);
+    ASSERT(mjs_ffi(vm, "b", (cfn_t) xx, "lb") == MJS_TRUE);
+    ASSERT(mjs_eval(mjs, "f(0);", -1) == MJS_ERROR);
+    mjs_destroy(vm);
+  }
+
   ASSERT(mjs_ffi(mjs, "log", (cfn_t) jslog, "vs") == MJS_TRUE);
   ASSERT(mjs_eval(mjs, "log('ffi js/c ok');", -1) == MJS_UNDEFINED);
 
@@ -450,6 +465,13 @@ static const char *test_subscript(void) {
   return NULL;
 }
 
+static const char *test_notsupported(void) {
+  struct mjs *mjs = mjs_create();
+  ASSERT(mjs_eval(mjs, "void", -1) == MJS_ERROR);
+  mjs_destroy(mjs);
+  return NULL;
+}
+
 static const char *run_all_tests(void) {
   RUN_TEST(test_if);
   RUN_TEST(test_strings);
@@ -459,6 +481,7 @@ static const char *run_all_tests(void) {
   RUN_TEST(test_scopes);
   RUN_TEST(test_function);
   RUN_TEST(test_objects);
+  RUN_TEST(test_notsupported);
   return NULL;
 }
 
