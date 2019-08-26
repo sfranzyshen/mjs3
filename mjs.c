@@ -153,7 +153,7 @@ char *mjs_to_str(struct mjs *, val_t, len_t *);      // Unpack string
 typedef enum {
   MJS_TYPE_UNDEFINED, MJS_TYPE_NULL, MJS_TYPE_TRUE, MJS_TYPE_FALSE,
   MJS_TYPE_STRING, MJS_TYPE_OBJECT, MJS_TYPE_ARRAY, MJS_TYPE_FUNCTION,
-  MJS_TYPE_NUMBER, MJS_TYPE_ERROR, MJS_TYPE_C_FUNCTION, MJS_TYPE_C_POINTER,
+  MJS_TYPE_NUMBER, MJS_TYPE_ERROR, MJS_TYPE_C_FUNCTION, MJS_TYPE_C_STRING,
 } mjs_type_t;
 // clang-format on
 
@@ -239,7 +239,7 @@ static float tof(val_t v) {
 static const char *mjs_typeof(val_t v) {
   const char *names[] = {"undefined", "null",   "true",   "false",
                          "string",    "object", "object", "function",
-                         "number",    "error",  "cfunc",  "cpointer",
+                         "number",    "error",  "cfunc",  "cstring",
                          "?",         "?",      "?",      "?"};
   return names[mjs_type(v)];
 }
@@ -324,23 +324,29 @@ static void vm_dump(const struct vm *vm) {
 ////////////////////////////////////// VM ////////////////////////////////////
 static val_t *vm_top(struct vm *vm) { return &vm->data_stack[vm->sp - 1]; }
 
+static void vm_swap(struct vm *vm) {
+  val_t *top = vm_top(vm), v = top[-1];
+  top[-1] = top[0];
+  top[0] = v;
+}
+
 static void abandon(struct vm *vm, val_t v) {
+  ind_t j;
   mjs_type_t t = mjs_type(v);
   LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
 
-  if (t != MJS_TYPE_OBJECT && t != MJS_TYPE_STRING) return;
-  {
-    ind_t j;
-    // If this value is still referenced, do nothing
-    for (j = 0; j < ARRSIZE(vm->props); j++) {
-      struct prop *prop = &vm->props[j];
-      if (prop->flags == 0) continue;
-      if (v == prop->key || v == prop->val) return;
-    }
-    // Look at the data stack too
-    for (j = 0; j < vm->sp; j++)
-      if (v == vm->data_stack[j]) return;
+  if (t != MJS_TYPE_OBJECT && t != MJS_TYPE_STRING && t != MJS_TYPE_FUNCTION)
+    return;
+
+  // If this value is still referenced, do nothing
+  for (j = 0; j < ARRSIZE(vm->props); j++) {
+    struct prop *prop = &vm->props[j];
+    if (prop->flags == 0) continue;
+    if (v == prop->key || v == prop->val) return;
   }
+  // Look at the data stack too
+  for (j = 0; j < vm->sp; j++)
+    if (v == vm->data_stack[j]) return;
 
   // vm_dump(vm);
   if (t == MJS_TYPE_OBJECT) {
@@ -356,7 +362,7 @@ static void abandon(struct vm *vm, val_t v) {
       abandon(vm, prop->val);
       i = prop->next;  // Point to the next property
     }
-  } else if (t == MJS_TYPE_STRING) {
+  } else if (t == MJS_TYPE_STRING || t == MJS_TYPE_FUNCTION) {
     ind_t k, j, i = (ind_t) VAL_PAYLOAD(v);     // String begin
     ind_t len = (ind_t)(vm->stringbuf[i] + 2);  // String length
 
@@ -874,8 +880,9 @@ static val_t do_op(struct parser *p, int op) {
       if (mjs_type(a) == MJS_TYPE_STRING && mjs_type(b) == MJS_TYPE_STRING) {
         val_t v = mjs_concat(p->vm, a, b);
         if (v == MJS_ERROR) return v;
-        top[-1] = v;
         vm_drop(p->vm);
+        vm_drop(p->vm);
+        vm_push(p->vm, v);
         break;
       }
     // clang-format off
@@ -883,8 +890,10 @@ static val_t do_op(struct parser *p, int op) {
     case DT('>', '>'): case DT('<', '<'): case TT('>', '>', '>'):
       // clang-format on
       if (mjs_type(a) == MJS_TYPE_NUMBER && mjs_type(b) == MJS_TYPE_NUMBER) {
-        top[-1] = tov(do_arith_op(tof(a), tof(b), op));
+        val_t v = tov(do_arith_op(tof(a), tof(b), op));
         vm_drop(p->vm);
+        vm_drop(p->vm);
+        vm_push(p->vm, v);
       } else {
         return vm_err(p->vm, "apples to apples please");
       }
@@ -1151,7 +1160,7 @@ static val_t call_js_function(struct parser *p, val_t f) {
   // Create scope
   TRY(create_scope(p->vm));
   scope = p->vm->call_stack[p->vm->csp - 1];
-  LOG((DBGPREFIX "%s: %d [%.*s]\n", __func__, mjs_type(scope), code_len, code));
+  LOG((DBGPREFIX "%s: [%.*s]\n", __func__, code_len, code));
 
   // Skip `function(` in the function definition
   pnext(&p2);
@@ -1171,8 +1180,10 @@ static val_t call_js_function(struct parser *p, val_t f) {
   // printf(" local scope: %s\n", tostr(p->vm, scope));
   while (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, MJS_UNDEFINED);
   while (p2.tok.tok != '{') pnext(&p2);  // Skip to the function body
+  LOG((DBGPREFIX "%s: xxx [%.*s]\n", __func__, code_len, p2.tok.ptr));
   res = parse_block(&p2, 0);             // Execute function body
-  LOG((DBGPREFIX "%s: R sp %d\n", __func__, p->vm->sp));
+  LOG((DBGPREFIX "%s: R sp %d [%.*s] res %s\n", __func__, p->vm->sp,
+       (int) code_len, code, tostr(p->vm, res)));
   while (p->vm->csp > saved_scp) delete_scope(p->vm);  // Restore current scope
   return res;
 }
@@ -1232,40 +1243,28 @@ static void ffi_set_float(struct ffi_arg *arg, float v) {
   arg->v.f = v;
 }
 
-/*
- * The ARM ABI uses only 4 32-bit registers for paramter passing.
- * Xtensa call0 calling-convention (as used by Espressif) has 6.
- *
- * Focusing only on implementing FFI with registers means we can simplify a lot.
- *
- * ARM has some quasi-alignment rules when mixing double and integers as
- * arguments. Only:
- *   a) double, int32_t, int32_t
- *   b) int32_t, double
- * would fit in 4 registers. (the same goes for uint64_t).
- *
- * In order to simplify further, when a double-width argument is present, we
- * allow only two arguments.
- */
-
-/*
- * We need to support x86_64 in order to support local tests.
- * x86_64 has more and wider registers, but unlike the two main
- * embedded platforms we target it has a separate register file for
- * integer values and for floating point values (both for passing args and
- * return values). E.g. if a double value is passed as a second argument
- * it gets passed in the first available floating point register.
- *
- * I.e, the compiler generates exactly the same code for:
- *
- * void foo(int a, double b) {...}
- *
- * and
- *
- * void foo(double b, int a) {...}
- *
- *
- */
+// The ARM ABI uses only 4 32-bit registers for paramter passing.
+// Xtensa call0 calling-convention (as used by Espressif) has 6.
+// Focusing only on implementing FFI with registers means we can simplify a
+// lot.
+//
+// ARM has some quasi-alignment rules when mixing double and integers as
+// arguments. Only:
+//   a) double, int32_t, int32_t
+//   b) int32_t, double
+// would fit in 4 registers. (the same goes for uint64_t).
+//
+// In order to simplify further, when a double-width argument is present, we
+// allow only two arguments.
+// We need to support x86_64 in order to support local tests.
+// x86_64 has more and wider registers, but unlike the two main
+// embedded platforms we target it has a separate register file for
+// integer values and for floating point values (both for passing args and
+// return values). E.g. if a double value is passed as a second argument
+// it gets passed in the first available floating point register.
+//
+// I.e, the compiler generates exactly the same code for:
+// void foo(int a, double b) {...}  and void foo(double b, int a) {...}
 
 typedef ffi_word_t (*w4w_t)(ffi_word_t, ffi_word_t, ffi_word_t, ffi_word_t);
 typedef ffi_word_t (*w5w_t)(ffi_word_t, ffi_word_t, ffi_word_t, ffi_word_t,
@@ -1898,7 +1897,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
 			case '[': ffi_set_ptr(arg, (void *) setfficb(p, av, &cbp, cf->decl, &i)); break;
 			case 'u': ffi_set_ptr(arg, &cbp); break;
 			case 's': ffi_set_ptr(arg, mjs_to_str(p->vm, av, 0)); break;
-			case 'b': ffi_set_bool(arg, (int) tof(av)); break;
+			case 'b': ffi_set_bool(arg, av == MJS_TRUE ? 1 : 0); break;
 			case 'f': ffi_set_float(arg, tof(av)); break;
 			case 'd': ffi_set_double(arg, (double) tof(av)); break;
 			case 'p': ffi_set_word(arg, toptr(p->vm, av)); break;
@@ -1941,6 +1940,18 @@ static val_t parse_call_dot_mem(struct parser *p, int prev_op) {
       if (!findtok(s_assign_ops, p->tok.tok) &&
           !findtok(s_postfix_ops, p->tok.tok) &&
           !findtok(s_postfix_ops, prev_tok)) {
+        val_t v = MJS_UNDEFINED, *top = vm_top(p->vm);
+        if (mjs_type(top[0]) == MJS_TYPE_NUMBER &&
+            mjs_type(top[-1]) == MJS_TYPE_STRING) {
+          len_t len, idx = tof(top[0]);
+          const char *s = mjs_to_str(p->vm, top[-1], &len);
+          if (idx >= 0 && idx < len) v = mk_str(p->vm, s + idx, 1);
+        } else {
+          v = vm_err(p->vm, "pls index strings by num");
+        }
+        vm_drop(p->vm);
+        vm_drop(p->vm);
+        vm_push(p->vm, v);
       }
     } else if (p->tok.tok == '(') {
       pnext(p);
@@ -2245,11 +2256,15 @@ static val_t parse_statement(struct parser *p) {
 static val_t parse_statement_list(struct parser *p, tok_t endtok) {
   val_t res = MJS_TRUE;
   pnext(p);
-  LOG((DBGPREFIX "%s: tok %d endtok %d\n", __func__, p->tok.tok, endtok));
+  LOG((DBGPREFIX "%s: tok %c endtok %c\n", __func__, p->tok.tok, endtok));
+  // printf(" ---> [%s]\n", p->tok.ptr);
   while (res != MJS_ERROR && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
-    // Drop previous value from the stack
     if (!p->noexec && p->vm->sp > 0) vm_drop(p->vm);
     res = parse_statement(p);
+    if (!p->noexec && p->vm->sp > 1 && 0) {
+      vm_swap(p->vm);
+      vm_drop(p->vm);
+    }
     while (p->tok.tok == ';') pnext(p);
   }
   if (!p->noexec && p->vm->sp == 0) vm_push(p->vm, MJS_UNDEFINED);
@@ -2276,9 +2291,11 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   vm->error_message[0] = '\0';
   if (parse_statement_list(&p, TOK_EOF) != MJS_ERROR && vm->sp == 1) {
     v = *vm_top(vm);
+  } else if (vm->error_message[0] == '\0') {
+    v = vm_err(vm, "stack %d", vm->sp);
   }
   vm_dump(vm);
-  LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
+  LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
   return v;
 }
 
