@@ -192,11 +192,10 @@ struct vm {
 
 #define ARRSIZE(x) ((sizeof(x) / sizeof((x)[0])))
 
-#define DBGPREFIX "[DEBUG] "
 #ifdef MJS_DEBUG
-#define LOG(x) printf x
+#define DEBUG(x) printf x
 #else
-#define LOG(x)
+#define DEBUG(x)
 #endif
 
 #define TRY(expr)                     \
@@ -211,7 +210,7 @@ static val_t vm_err(struct vm *vm, const char *fmt, ...) {
   va_start(ap, fmt);
   vsnprintf(vm->error_message, sizeof(vm->error_message), fmt, ap);
   va_end(ap);
-  // LOG((DBGPREFIX "%s: %s\n", __func__, vm->error_message));
+  // DEBUG(( "%s: %s\n", __func__, vm->error_message));
   return MJS_ERROR;
 }
 
@@ -262,7 +261,7 @@ static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
     case MJS_TYPE_FUNCTION: {
       len_t n;
       const char *ptr = mjs_to_str(vm, v, &n);
-      snprintf(buf, len, "%.*s", n, ptr);
+      snprintf(buf, len, "\"%.*s\"", n, ptr);
       break;
     }
     case MJS_TYPE_ERROR:
@@ -272,8 +271,9 @@ static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
       int n = snprintf(buf, len, "{");
       struct prop *prop = firstprop(vm, v);
       while (prop != NULL) {
-        char *key = mjs_to_str(vm, prop->key, NULL);
-        n += snprintf(buf + n, len - n, "%s\"%s\":", n > 4 ? "," : "", key);
+        if (n > 1) n += snprintf(buf + n, len - n, ",");
+        n += strlen(_tos(vm, prop->key, buf + n, len - n));
+        n += snprintf(buf + n, len - n, ":");
         n += strlen(_tos(vm, prop->val, buf + n, len - n));
         prop = prop->next == INVALID_INDEX ? NULL : &vm->props[prop->next];
       }
@@ -288,7 +288,7 @@ static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
 }
 
 const char *tostr(struct vm *vm, val_t v) {
-  static char buf[64];
+  static char buf[128];
   return _tos(vm, v, buf, sizeof(buf));
 }
 
@@ -332,7 +332,7 @@ static void vm_swap(struct vm *vm) {
 static void abandon(struct vm *vm, val_t v) {
   ind_t j;
   mjs_type_t t = mjs_type(v);
-  LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
+  DEBUG(("%s: %s\n", __func__, tostr(vm, v)));
 
   if (t != MJS_TYPE_OBJECT && t != MJS_TYPE_STRING && t != MJS_TYPE_FUNCTION)
     return;
@@ -395,7 +395,7 @@ static void abandon(struct vm *vm, val_t v) {
 
 static val_t vm_push(struct vm *vm, val_t v) {
   if (vm->sp < ARRSIZE(vm->data_stack)) {
-    LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
+    DEBUG(("%s: %s\n", __func__, tostr(vm, v)));
     vm->data_stack[vm->sp] = v;
     vm->sp++;
     return MJS_TRUE;
@@ -406,7 +406,7 @@ static val_t vm_push(struct vm *vm, val_t v) {
 
 static val_t vm_drop(struct vm *vm) {
   if (vm->sp > 0) {
-    LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
+    DEBUG(("%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
     vm->sp--;
     abandon(vm, vm->data_stack[vm->sp]);
     return MJS_TRUE;
@@ -486,7 +486,7 @@ static val_t create_scope(struct vm *vm) {
     return vm_err(vm, "Call stack OOM");
   }
   if ((scope = mk_obj(vm)) == MJS_ERROR) return MJS_ERROR;
-  LOG((DBGPREFIX "%s\n", __func__));
+  DEBUG(("%s\n", __func__));
   vm->call_stack[vm->csp] = scope;
   vm->csp++;
   return scope;
@@ -496,7 +496,7 @@ static val_t delete_scope(struct vm *vm) {
   if (vm->csp <= 0 || vm->csp >= ARRSIZE(vm->call_stack)) {
     return vm_err(vm, "Corrupt call stack");
   } else {
-    LOG((DBGPREFIX "%s\n", __func__));
+    DEBUG(("%s\n", __func__));
     vm->csp--;
     abandon(vm, vm->call_stack[vm->csp]);
     return MJS_TRUE;
@@ -584,8 +584,8 @@ val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
 
         p->key = key;
         p->val = val;
-        LOG((DBGPREFIX "%s: prop %hu %s -> ", __func__, i, tostr(vm, key)));
-        LOG(("%s\n", tostr(vm, val)));
+        DEBUG(("%s: prop %hu %s -> ", __func__, i, tostr(vm, key)));
+        DEBUG(("%s\n", tostr(vm, val)));
         return MJS_TRUE;
       }
       return vm_err(vm, "props OOM");
@@ -811,7 +811,7 @@ static tok_t pnext(struct parser *p) {
   if (p->pos < p->end && p->pos[0] != '\0') p->pos++;
   p->prev_tok = p->tok.tok;
   p->tok.tok = tok;
-  // LOG((DBGPREFIX "%s: tok %d [%c] [%.*s]\n", __func__, tok, tok,
+  // DEBUG(( "%s: tok %d [%c] [%.*s]\n", __func__, tok, tok,
   //     (int) (p->end - p->pos), p->pos));
   return p->tok.tok;
 }
@@ -891,9 +891,9 @@ static val_t do_assign_op(struct vm *vm, tok_t op) {
 static val_t do_op(struct parser *p, int op) {
   val_t *top = vm_top(p->vm), a = top[-1], b = top[0];
   if (p->noexec) return MJS_TRUE;
-  LOG((DBGPREFIX "%s: sp %d op %c %d\n", __func__, p->vm->sp, op, op));
-  LOG((DBGPREFIX "    top-1 %s\n", tostr(p->vm, b)));
-  LOG((DBGPREFIX "    top-2 %s\n", tostr(p->vm, a)));
+  DEBUG(("%s: sp %d op %c %d\n", __func__, p->vm->sp, op, op));
+  DEBUG(("    top-1 %s\n", tostr(p->vm, b)));
+  DEBUG(("    top-2 %s\n", tostr(p->vm, a)));
   switch (op) {
     case '+':
       if (mjs_type(a) == MJS_TYPE_STRING && mjs_type(b) == MJS_TYPE_STRING) {
@@ -1023,7 +1023,7 @@ static val_t parse_function(struct parser *p) {
   val_t res = MJS_TRUE;
   int name_provided = 0;
   struct tok tmp = p->tok;
-  LOG((DBGPREFIX "%s: START: [%d]\n", __func__, p->vm->sp));
+  DEBUG(("%s: START: [%d]\n", __func__, p->vm->sp));
   p->noexec++;
   pnext(p);
   if (p->tok.tok == TOK_IDENT) {  // Function name provided: function ABC()...
@@ -1048,7 +1048,7 @@ static val_t parse_function(struct parser *p) {
     res = vm_push(p->vm, f);
   }
   p->noexec--;
-  LOG((DBGPREFIX "%s: STOP: [%d]\n", __func__, p->vm->sp));
+  DEBUG(("%s: STOP: [%d]\n", __func__, p->vm->sp));
   return res;
 }
 
@@ -1102,7 +1102,7 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
       res = parse_object_literal(p);
       break;
     case TOK_IDENT:
-      // LOG((DBGPREFIX "%s: IDENT: [%d]\n", __func__, prev_op));
+      // DEBUG(( "%s: IDENT: [%d]\n", __func__, prev_op));
       if (!p->noexec) {
         tok_t prev_tok = p->prev_tok;
         tok_t next_tok = lookahead(p);
@@ -1114,7 +1114,7 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
         } else {
           // Assign
           val_t *v = lookup(p->vm, p->tok.ptr, p->tok.len);
-          LOG((DBGPREFIX "%s: AS: [%.*s]\n", __func__, p->tok.len, p->tok.ptr));
+          DEBUG(("%s: AS: [%.*s]\n", __func__, p->tok.len, p->tok.ptr));
           if (v == NULL) {
             return vm_err(p->vm, "doh");
           } else {
@@ -1122,7 +1122,7 @@ static val_t parse_literal(struct parser *p, tok_t prev_op) {
             size_t off = offsetof(struct prop, val);
             struct prop *prop = (struct prop *) ((char *) v - off);
             ind_t ind = (ind_t)(prop - p->vm->props);
-            LOG((DBGPREFIX "   ind %d\n", ind));
+            DEBUG(("   ind %d\n", ind));
             TRY(vm_push(p->vm, tov(ind)));
           }
         }
@@ -1179,7 +1179,7 @@ static val_t call_js_function(struct parser *p, val_t f) {
   // Create scope
   TRY(create_scope(p->vm));
   scope = p->vm->call_stack[p->vm->csp - 1];
-  LOG((DBGPREFIX "%s: [%.*s]\n", __func__, code_len, code));
+  DEBUG(("%s: [%.*s]\n", __func__, code_len, code));
 
   // Skip `function(` in the function definition
   pnext(&p2);
@@ -1194,15 +1194,15 @@ static val_t call_js_function(struct parser *p, val_t f) {
     // Check whether we have a defined name for this argument
     if (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, *vm_top(p->vm));
     vm_drop(p->vm);  // Drop argument value from the data_stack
-    LOG((DBGPREFIX "%s: P sp %d\n", __func__, p->vm->sp));
   }
   // printf(" local scope: %s\n", tostr(p->vm, scope));
   while (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, MJS_UNDEFINED);
-  while (p2.tok.tok != '{') pnext(&p2);  // Skip to the function body
-  LOG((DBGPREFIX "%s: xxx [%.*s]\n", __func__, code_len, p2.tok.ptr));
+  while (p2.tok.tok != '{' && p2.tok.tok != TOK_EOF) pnext(&p2);
+  DEBUG(("%s: [%.*s] args %s\n", __func__, code_len, p2.tok.ptr,
+         tostr(p->vm, scope)));
   res = parse_block(&p2, 0);             // Execute function body
-  LOG((DBGPREFIX "%s: R sp %d [%.*s] res %s\n", __func__, p->vm->sp,
-       (int) code_len, code, tostr(p->vm, res)));
+  DEBUG(("%s: [%.*s] res %s\n", __func__, (int) code_len, code,
+         tostr(p->vm, res)));
   while (p->vm->csp > saved_scp) delete_scope(p->vm);  // Restore current scope
   return res;
 }
@@ -1219,7 +1219,6 @@ enum ffi_ctype {
 
 union ffi_val {
   ffi_word_t w;
-  // int64_t i;
   unsigned long i;
   double d;
   float f;
@@ -1795,7 +1794,7 @@ static ffi_word_t fficb(struct fficbparam *cbp, union ffi_val *args) {
   }
   if (n < (int) sizeof(buf)) buf[n++] = ')';
   if (n < (int) sizeof(buf)) buf[n++] = '\0';
-  // printf("js cb: %p '%s'\n", cbp, buf);
+  DEBUG(("%s: %p %s\n", __func__, cbp, buf));
   p2 = mk_parser(cbp->p->vm, buf, n);
   pnext(&p2);
   call_js_function(&p2, cbp->jsfunc);
@@ -1873,7 +1872,12 @@ static w6w_t setfficb(struct parser *p, val_t jsfunc, struct fficbparam *cbp,
   return res;
 }
 
-static ffi_word_t toptr(struct mjs *vm, val_t v) {
+static val_t wtoval(struct mjs *vm, ffi_word_t w) {
+  char buf[20];
+  return mk_str(vm, buf, snprintf(buf, sizeof(buf), "%lx", w));
+}
+
+static ffi_word_t valtow(struct mjs *vm, val_t v) {
   ffi_word_t ret = 0;
   if (mjs_type(v) == MJS_TYPE_STRING) {
     const char *s = mjs_to_str(vm, v, 0);
@@ -1921,7 +1925,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
 			case 'f': ffi_set_float(arg, tof(av)); break;
 			case 'd': ffi_set_double(arg, (double) tof(av)); break;
 			case 'j': ffi_set_word(arg, (ffi_word_t) av); break;
-			case 'p': ffi_set_word(arg, toptr(p->vm, av)); break;
+			case 'p': ffi_set_word(arg, valtow(p->vm, av)); break;
 			case 'i': ffi_set_word(arg, (int) tof(av)); break;
 			default: return  vm_err(p->vm, "bad ffi type '%c'", cf->decl[i]); break;
 		}
@@ -1933,6 +1937,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
 	ffi_call(cf->fn, num_passed_args, &args[0], &args[1]);
 	switch (cf->decl[0]) {
 		case 's': v = mk_str(p->vm, (char *) args[0].v.i, -1); break;
+		case 'p': v = wtoval(p->vm, args[0].v.w); break;
 		case 'f': v = tov(args[0].v.f); break;
 		case 'd': v = tov((float) args[0].v.d); break;
 		case 'v': v = MJS_UNDEFINED; break;
@@ -1943,7 +1948,7 @@ static val_t call_c_function(struct parser *p, val_t f) {
   // clang-format on
         while (vm_top(p->vm) > top) vm_drop(p->vm);  // Abandon pushed args
         vm_drop(p->vm);                              // Abandon function object
-        LOG((DBGPREFIX "%s: %d\n", __func__, p->tok.tok));
+        DEBUG(("%s: %d\n", __func__, p->tok.tok));
         return vm_push(p->vm, v);  // Push call result
 }
 
@@ -2149,7 +2154,7 @@ static val_t parse_let(struct parser *p) {
     key = mk_str(p->vm, tmp.ptr, tmp.len);
     TRY(key);
     TRY(mjs_set(p->vm, obj, key, val));
-    // LOG((DBGPREFIX "%s: sp %d, %d\n", __func__, p->vm->sp, p->tok.tok));
+    // DEBUG(( "%s: sp %d, %d\n", __func__, p->vm->sp, p->tok.tok));
     if (p->tok.tok == ',') {
       TRY(vm_drop(p->vm));
       pnext(p);
@@ -2199,15 +2204,15 @@ static val_t parse_while(struct parser *p) {
     } else {
       // TODO(lsm): optimise here, p->pos = post_condition if it is saved
       p->noexec++;
-      LOG((DBGPREFIX "%s: FALSE!!.., sp %d\n", __func__, p->vm->sp));
+      DEBUG(("%s: FALSE!!.., sp %d\n", __func__, p->vm->sp));
     }
     TRY(parse_block_or_stmt(p, 1));
-    LOG((DBGPREFIX "%s: done.., sp %d\n", __func__, p->vm->sp));
+    DEBUG(("%s: done.., sp %d\n", __func__, p->vm->sp));
     if (p->noexec) break;
     vm_drop(p->vm);
     // vm_dump(p->vm);
   }
-  LOG((DBGPREFIX "%s: out.., sp %d\n", __func__, p->vm->sp));
+  DEBUG(("%s: out.., sp %d\n", __func__, p->vm->sp));
   p->noexec = tmp.noexec;
   return res;
 }
@@ -2277,7 +2282,7 @@ static val_t parse_statement(struct parser *p) {
 static val_t parse_statement_list(struct parser *p, tok_t endtok) {
   val_t res = MJS_TRUE;
   pnext(p);
-  LOG((DBGPREFIX "%s: tok %c endtok %c\n", __func__, p->tok.tok, endtok));
+  DEBUG(("%s: tok %c endtok %c\n", __func__, p->tok.tok, endtok));
   // printf(" ---> [%s]\n", p->tok.ptr);
   while (res != MJS_ERROR && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
     if (!p->noexec && p->vm->sp > 0) vm_drop(p->vm);
@@ -2302,7 +2307,7 @@ struct vm *mjs_create(void) {
   vm->objs[0].props = INVALID_INDEX;
   vm->call_stack[0] = MK_VAL(MJS_TYPE_OBJECT, 0);
   vm->csp++;
-  LOG((DBGPREFIX "%s: size %d bytes\n", __func__, (int) sizeof(*vm)));
+  DEBUG(("%s: size %d bytes\n", __func__, (int) sizeof(*vm)));
   return vm;
 };
 
@@ -2318,7 +2323,7 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
     v = vm_err(vm, "stack %d", vm->sp);
   }
   vm_dump(vm);
-  LOG((DBGPREFIX "%s: %s\n", __func__, tostr(vm, v)));
+  DEBUG(("%s: %s\n", __func__, tostr(vm, v)));
   return v;
 }
 

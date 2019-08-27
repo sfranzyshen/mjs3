@@ -24,9 +24,10 @@
 #define RUN_TEST(fn)                                             \
   do {                                                           \
     clock_t started = clock();                                   \
+    int n = g_num_checks;                                        \
     const char *msg = fn();                                      \
     double took = (double) (clock() - started) / CLOCKS_PER_SEC; \
-    printf("  [%.3f] %s\n", took, #fn);                          \
+    printf("  [%.3f %3d] %s\n", took, g_num_checks - n, #fn);    \
     fflush(stdout);                                              \
     if (msg) return msg;                                         \
   } while (0)
@@ -344,16 +345,11 @@ static bool fb(void) {
 }
 
 static bool fbd(double x) {
-  // printf("x: %g\n", x);
   return x > 3.14;
 }
 
 static bool fbiiiii(int n1, int n2, int n3, int n4, int n5) {
   return n1 + n2 + n3 + n4 + n5;
-}
-
-static void jslog(const char *s) {
-  (void) s;
 }
 
 struct foo {
@@ -363,28 +359,22 @@ struct foo {
   int len;
 };
 
-#if 0
-struct sdef {
-  const char *name;
-  size_t offset;
-};
-
-static struct sdef *foodef(void) {
-  static struct sdef def[] = {{"n", offsetof(struct foo, n)}, {NULL, 0}};
-  return def;
-}
-#endif
-
 static int getint(void *base, int offset) {
   return *(int *) ((char *) base + offset);
 }
 
+static void *getptr(void *base, int offset) {
+  return *(void **) ((char *) base + offset);
+}
+
 static int getu8(void *base, int offset) {
+  // printf("%s --> %p %d\n", __func__, base, offset);
   return *((unsigned char *) base + offset);
 }
 
 static int cb1(int (*cb)(struct foo *, void *), void *arg) {
   struct foo foo = {1, 4, (char *) "some data", 4};
+  // printf("%s --> %p\n", __func__, foo.data);
   return cb(&foo, arg);
 }
 
@@ -392,9 +382,15 @@ static bool xx(bool arg) {
   return !arg;
 }
 
+static void jslog(const char *s) {
+  // printf("%s\n", s);
+  (void) s;
+}
+
 static const char *test_ffi(void) {
   struct mjs *mjs = mjs_create();
 
+  ASSERT(mjs_ffi(mjs, "str", (cfn_t) tostr, "smj") == MJS_TRUE);
   ASSERT(mjs_ffi(mjs, "xx", (cfn_t) xx, "bb") == MJS_TRUE);
   CHECK_NUMERIC("xx(true) ? 2 : 3;", 3);
   CHECK_NUMERIC("xx(false) ? 2 : 3;", 2);
@@ -413,6 +409,7 @@ static const char *test_ffi(void) {
 
   ASSERT(mjs_ffi(mjs, "gi", (cfn_t) getint, "ipi") == MJS_TRUE);
   ASSERT(mjs_ffi(mjs, "gu8", (cfn_t) getu8, "ipi") == MJS_TRUE);
+  ASSERT(mjs_ffi(mjs, "gp", (cfn_t) getptr, "ppi") == MJS_TRUE);
 
   ASSERT(mjs_ffi(mjs, "f2", (cfn_t) fb, "b") == MJS_TRUE);
   ASSERT(mjs_eval(mjs, "f2();", -1) == MJS_TRUE);
@@ -426,7 +423,15 @@ static const char *test_ffi(void) {
   ASSERT(mjs_eval(mjs, "f4(3.13);", -1) == MJS_FALSE);
 
   ASSERT(mjs_ffi(mjs, "f1", (cfn_t) cb1, "i[ipu]u") == MJS_TRUE);
-  ASSERT(numexpr(mjs, "f1(function(a,b){return gi(a,0) + gu8(a,4);},0);", 5));
+  // printf("%lu %lu\n", offsetof(struct foo, data), offsetof(struct foo, x));
+  CHECK_NUMERIC(
+      "f1(function(a,b){"
+      "let p = gp(a,0); return gi(a,0) + gu8(a,4);},0);",
+      5);
+  CHECK_NUMERIC(
+      "f1(function(a){let x = gp(a,8); "
+      "return gi(a,0) + gu8(a,4) + gu8(x, 0); },0)",
+      120);
 
   ASSERT(mjs_ffi(mjs, "pi", (cfn_t) pi, "f") == MJS_TRUE);
   ASSERT(numexpr(mjs, "pi() * 2;", 6.2831852));
@@ -475,6 +480,7 @@ static const char *test_notsupported(void) {
 static const char *test_comments(void) {
   struct mjs *mjs = mjs_create();
   CHECK_NUMERIC("// hi there!!\n/*\n\n fooo */\n\n   \t\t1", 1);
+  CHECK_NUMERIC("1 /* foo */ + /* 3 bar */ 2", 3);
   mjs_destroy(mjs);
   return NULL;
 }
@@ -487,7 +493,7 @@ static const char *test_stringify(void) {
   ASSERT(strexpr(mjs, "str(0,{a:1,b:3.14});", expected));
   expected = "{\"a\":true,\"b\":false}";
   ASSERT(strexpr(mjs, "str(0,{a:true,b:false});", expected));
-  expected = "{\"a\":function(){}}";
+  expected = "{\"a\":\"function(){}\"}";
   ASSERT(strexpr(mjs, "str(0,{a:function(){}});", expected));
   expected = "{\"a\":cfunc}";
   ASSERT(strexpr(mjs, "str(0,{a:str});", expected));
@@ -495,11 +501,14 @@ static const char *test_stringify(void) {
   ASSERT(strexpr(mjs, "str(0,{a:null});", expected));
   expected = "{\"a\":undefined}";
   ASSERT(strexpr(mjs, "str(0,{a:undefined});", expected));
+  expected = "{\"a\":\"b\"}";
+  ASSERT(strexpr(mjs, "str(0,{a:'b'});", expected));
   mjs_destroy(mjs);
   return NULL;
 }
 
 static const char *run_all_tests(void) {
+  RUN_TEST(test_stringify);
   RUN_TEST(test_if);
   RUN_TEST(test_strings);
   RUN_TEST(test_expr);
@@ -510,7 +519,6 @@ static const char *run_all_tests(void) {
   RUN_TEST(test_objects);
   RUN_TEST(test_notsupported);
   RUN_TEST(test_comments);
-  RUN_TEST(test_stringify);
   return NULL;
 }
 
