@@ -1,8 +1,8 @@
 # Elk - a restricted JS engine for embedded systems
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
-[![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
-[![Code Coverage](https://codecov.io/gh/cpq/mjs3/branch/master/graph/badge.svg)](https://codecov.io/gh/cpq/mjs3)
+[![Build Status](https://travis-ci.org/cpq/elk.svg?branch=master)](https://travis-ci.org/cpq/elk)
+[![Code Coverage](https://codecov.io/gh/cpq/elk/branch/master/graph/badge.svg)](https://codecov.io/gh/cpq/elk)
 
 
 Elk is a single-file JavaScript engine for microcontrollers.
