@@ -265,9 +265,6 @@ static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
       snprintf(buf, len, "%.*s", n, ptr);
       break;
     }
-    case MJS_TYPE_C_FUNCTION:
-      snprintf(buf, len, "cfunc@%p", vm->cfuncs[VAL_PAYLOAD(v)].fn);
-      break;
     case MJS_TYPE_ERROR:
       snprintf(buf, len, "ERROR: %s", vm->error_message);
       break;
@@ -284,7 +281,7 @@ static const char *_tos(struct vm *vm, val_t v, char *buf, int len) {
       break;
     }
     default:
-      snprintf(buf, len, "[%s]", mjs_typeof(v));
+      snprintf(buf, len, "%s", mjs_typeof(v));
       break;
   }
   return buf;
@@ -549,11 +546,22 @@ val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
   if (mjs_type(obj) == MJS_TYPE_OBJECT) {
     len_t len;
     const char *ptr = mjs_to_str(vm, key, &len);
-    val_t *prop = findprop(vm, obj, ptr, len);
-    if (prop != NULL) {
-      *prop = val;
-      return MJS_TRUE;
-    } else {
+    struct prop *prop = firstprop(vm, obj);
+    while (prop != NULL) {
+      len_t n = 0;
+      char *key = mjs_to_str(vm, prop->key, &n);
+      if (n == len && memcmp(key, ptr, n) == 0) {
+        // The key already exists. Set the new value
+        val_t old = prop->val;
+        prop->val = val;
+        abandon(vm, old);
+        return MJS_TRUE;
+      }
+      if (prop->next == INVALID_INDEX) break;
+      prop = &vm->props[prop->next];
+    }
+
+    {
       ind_t i, obj_index = (ind_t) VAL_PAYLOAD(obj);
       struct obj *o = &vm->objs[obj_index];
       if (obj_index >= ARRSIZE(vm->objs)) {
@@ -563,8 +571,17 @@ val_t mjs_set(struct vm *vm, val_t obj, val_t key, val_t val) {
         struct prop *p = &vm->props[i];
         if (p->flags != 0) continue;
         p->flags = PROP_ALLOCATED;
-        p->next = o->props;  // Link to the current
-        o->props = i;        // props list
+
+        // Append property to the end of the property list
+        if (prop == NULL) {
+          p->next = o->props;
+          o->props = i;
+        } else {
+          assert(prop->next = INVALID_INDEX);
+          prop->next = i;
+          p->next = INVALID_INDEX;
+        }
+
         p->key = key;
         p->val = val;
         LOG((DBGPREFIX "%s: prop %hu %s -> ", __func__, i, tostr(vm, key)));

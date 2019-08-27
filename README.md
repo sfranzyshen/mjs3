@@ -5,7 +5,7 @@
 [![Code Coverage](https://codecov.io/gh/cpq/mjs3/branch/master/graph/badge.svg)](https://codecov.io/gh/cpq/mjs3)
 
 
-mJS is a single-source JavaScript engine for microcontrollers.
+mJS is a single-file JavaScript engine for microcontrollers.
 
 ## Features
 

@@ -481,8 +481,20 @@ static const char *test_comments(void) {
 
 static const char *test_stringify(void) {
   struct mjs *mjs = mjs_create();
+  const char *expected;
   mjs_ffi(mjs, "str", (cfn_t) tostr, "smj");
-  // ASSERT(strexpr(mjs, "str(0,{a:1,b:3.14});", "{\"a\":1,\"b\":3.14}"));
+  expected = "{\"a\":1,\"b\":3.14}";
+  ASSERT(strexpr(mjs, "str(0,{a:1,b:3.14});", expected));
+  expected = "{\"a\":true,\"b\":false}";
+  ASSERT(strexpr(mjs, "str(0,{a:true,b:false});", expected));
+  expected = "{\"a\":function(){}}";
+  ASSERT(strexpr(mjs, "str(0,{a:function(){}});", expected));
+  expected = "{\"a\":cfunc}";
+  ASSERT(strexpr(mjs, "str(0,{a:str});", expected));
+  expected = "{\"a\":null}";
+  ASSERT(strexpr(mjs, "str(0,{a:null});", expected));
+  expected = "{\"a\":undefined}";
+  ASSERT(strexpr(mjs, "str(0,{a:undefined});", expected));
   mjs_destroy(mjs);
   return NULL;
 }
