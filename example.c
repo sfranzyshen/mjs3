@@ -9,11 +9,11 @@
 int main(int argc, char *argv[]) {
   int i;
   struct elk *elk = js_create();
-  jsval_t res = MJS_UNDEFINED;
+  jsval_t res = JS_UNDEFINED;
 
   js_ffi(elk, tostr, "smj");
 
-  for (i = 1; i < argc && argv[i][0] == '-' && res != MJS_ERROR; i++) {
+  for (i = 1; i < argc && argv[i][0] == '-' && res != JS_ERROR; i++) {
     if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
       const char *code = argv[++i];
       res = js_eval(elk, code, -1);

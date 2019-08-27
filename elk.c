@@ -14,32 +14,32 @@
 // Alternatively, you can license this software under a commercial
 // license, please contact us at https://mdash.net/home/company.html
 
-#ifndef MJS_DATA_STACK_SIZE
-#define MJS_DATA_STACK_SIZE 10
+#ifndef JS_DATA_STACK_SIZE
+#define JS_DATA_STACK_SIZE 10
 #endif
 
-#ifndef MJS_CALL_STACK_SIZE
-#define MJS_CALL_STACK_SIZE 10
+#ifndef JS_CALL_STACK_SIZE
+#define JS_CALL_STACK_SIZE 10
 #endif
 
-#ifndef MJS_STRING_POOL_SIZE
-#define MJS_STRING_POOL_SIZE 256
+#ifndef JS_STRING_POOL_SIZE
+#define JS_STRING_POOL_SIZE 256
 #endif
 
-#ifndef MJS_OBJ_POOL_SIZE
-#define MJS_OBJ_POOL_SIZE 20
+#ifndef JS_OBJ_POOL_SIZE
+#define JS_OBJ_POOL_SIZE 20
 #endif
 
-#ifndef MJS_PROP_POOL_SIZE
-#define MJS_PROP_POOL_SIZE 30
+#ifndef JS_PROP_POOL_SIZE
+#define JS_PROP_POOL_SIZE 30
 #endif
 
-#ifndef MJS_ERROR_MESSAGE_SIZE
-#define MJS_ERROR_MESSAGE_SIZE 40
+#ifndef JS_ERROR_MESSAGE_SIZE
+#define JS_ERROR_MESSAGE_SIZE 40
 #endif
 
-#ifndef MJS_H
-#define MJS_H
+#ifndef JS_H
+#define JS_H
 
 #if defined(__cplusplus)
 extern "C" {
@@ -82,7 +82,7 @@ const char *js_stringify(struct elk *, jsval_t v);            // Stringify
 unsigned long js_size(void);                                  // Get VM size
 
 // Converting from C type to jsval_t
-// Use MJS_UNDEFINED, MJS_NULL, MJS_TRUE, MJS_FALSE for other scalar types
+// Use JS_UNDEFINED, JS_NULL, JS_TRUE, JS_FALSE for other scalar types
 jsval_t js_mk_obj(struct elk *);
 jsval_t js_mk_str(struct elk *, const char *, int len);
 jsval_t js_mk_num(float value);
@@ -124,11 +124,11 @@ char *js_to_str(struct elk *, jsval_t, jslen_t *);  // Unpack string
 #define VAL_TYPE(v) ((js_type_t)(((v) >> 19) & 0x0f))
 #define VAL_PAYLOAD(v) ((v) & ~0xfff80000)
 
-#define MJS_UNDEFINED MK_VAL(MJS_TYPE_UNDEFINED, 0)
-#define MJS_ERROR MK_VAL(MJS_TYPE_ERROR, 0)
-#define MJS_TRUE MK_VAL(MJS_TYPE_TRUE, 0)
-#define MJS_FALSE MK_VAL(MJS_TYPE_FALSE, 0)
-#define MJS_NULL MK_VAL(MJS_TYPE_NULL, 0)
+#define JS_UNDEFINED MK_VAL(JS_TYPE_UNDEFINED, 0)
+#define JS_ERROR MK_VAL(JS_TYPE_ERROR, 0)
+#define JS_TRUE MK_VAL(JS_TYPE_TRUE, 0)
+#define JS_FALSE MK_VAL(JS_TYPE_FALSE, 0)
+#define JS_NULL MK_VAL(JS_TYPE_NULL, 0)
 
 #include <assert.h>
 #include <float.h>
@@ -141,22 +141,22 @@ char *js_to_str(struct elk *, jsval_t, jslen_t *);  // Unpack string
 
 // clang-format off
 typedef enum {
-  MJS_TYPE_UNDEFINED, MJS_TYPE_NULL, MJS_TYPE_TRUE, MJS_TYPE_FALSE,
-  MJS_TYPE_STRING, MJS_TYPE_OBJECT, MJS_TYPE_ARRAY, MJS_TYPE_FUNCTION,
-  MJS_TYPE_NUMBER, MJS_TYPE_ERROR, MJS_TYPE_C_FUNCTION, MJS_TYPE_C_STRING,
+  JS_TYPE_UNDEFINED, JS_TYPE_NULL, JS_TYPE_TRUE, JS_TYPE_FALSE,
+  JS_TYPE_STRING, JS_TYPE_OBJECT, JS_TYPE_ARRAY, JS_TYPE_FUNCTION,
+  JS_TYPE_NUMBER, JS_TYPE_ERROR, JS_TYPE_C_FUNCTION, JS_TYPE_C_STRING,
 } js_type_t;
 // clang-format on
 
 struct prop {
   jsval_t key;
   jsval_t val;
-  ind_t flags;  // see MJS_PROP_* below
+  ind_t flags;  // see JS_PROP_* below
   ind_t next;   // index of the next prop, or INVALID_INDEX if last one
 };
 #define PROP_ALLOCATED 1
 
 struct obj {
-  ind_t flags;  // see MJS_OBJ_* defines below
+  ind_t flags;  // see JS_OBJ_* defines below
   ind_t props;  // index of the first property, or INVALID_INDEX
 };
 #define OBJ_ALLOCATED 1
@@ -171,31 +171,31 @@ struct cfunc {
 };
 
 struct elk {
-  char error_message[MJS_ERROR_MESSAGE_SIZE];
-  jsval_t data_stack[MJS_DATA_STACK_SIZE];
-  jsval_t call_stack[MJS_CALL_STACK_SIZE];
+  char error_message[JS_ERROR_MESSAGE_SIZE];
+  jsval_t data_stack[JS_DATA_STACK_SIZE];
+  jsval_t call_stack[JS_CALL_STACK_SIZE];
   ind_t sp;                               // Points to the top of the data stack
   ind_t csp;                              // Points to the top of the call stack
   ind_t stringbuf_len;                    // String pool current length
-  struct obj objs[MJS_OBJ_POOL_SIZE];     // Objects pool
-  struct prop props[MJS_PROP_POOL_SIZE];  // Props pool
-  uint8_t stringbuf[MJS_STRING_POOL_SIZE];   // String pool
+  struct obj objs[JS_OBJ_POOL_SIZE];      // Objects pool
+  struct prop props[JS_PROP_POOL_SIZE];   // Props pool
+  uint8_t stringbuf[JS_STRING_POOL_SIZE];    // String pool
   struct cfunc *cfuncs;                      // Registered FFI-ed functions
   ind_t cfunc_count;                         // Number of FFI-ed functions
 };
 
 #define ARRSIZE(x) ((sizeof(x) / sizeof((x)[0])))
 
-#ifdef MJS_DEBUG
+#ifdef JS_DEBUG
 #define DEBUG(x) printf x
 #else
 #define DEBUG(x)
 #endif
 
-#define TRY(expr)                     \
-  do {                                \
-    res = expr;                       \
-    if (res == MJS_ERROR) return res; \
+#define TRY(expr)                    \
+  do {                               \
+    res = expr;                      \
+    if (res == JS_ERROR) return res; \
   } while (0)
 
 //////////////////////////////////// HELPERS /////////////////////////////////
@@ -205,7 +205,7 @@ static jsval_t vm_err(struct elk *vm, const char *fmt, ...) {
   vsnprintf(vm->error_message, sizeof(vm->error_message), fmt, ap);
   va_end(ap);
   // DEBUG(( "%s: %s\n", __func__, vm->error_message));
-  return MJS_ERROR;
+  return JS_ERROR;
 }
 
 union js_type_holder {
@@ -214,7 +214,7 @@ union js_type_holder {
 };
 
 static js_type_t js_type(jsval_t v) {
-  return IS_FLOAT(v) ? MJS_TYPE_NUMBER : VAL_TYPE(v);
+  return IS_FLOAT(v) ? JS_TYPE_NUMBER : VAL_TYPE(v);
 }
 
 static jsval_t tov(float f) {
@@ -242,7 +242,7 @@ static const char *_tos(struct elk *vm, jsval_t v, char *buf, int len) {
   js_type_t t = js_type(v);
   if (len <= 0 || buf == NULL) return buf;
   switch (t) {
-    case MJS_TYPE_NUMBER: {
+    case JS_TYPE_NUMBER: {
       double f = tof(v), iv;
       if (modf(f, &iv) == 0) {
         snprintf(buf, len, "%ld", (long) f);
@@ -251,17 +251,17 @@ static const char *_tos(struct elk *vm, jsval_t v, char *buf, int len) {
       }
       break;
     }
-    case MJS_TYPE_STRING:
-    case MJS_TYPE_FUNCTION: {
+    case JS_TYPE_STRING:
+    case JS_TYPE_FUNCTION: {
       jslen_t n;
       const char *ptr = js_to_str(vm, v, &n);
       snprintf(buf, len, "\"%.*s\"", n, ptr);
       break;
     }
-    case MJS_TYPE_ERROR:
+    case JS_TYPE_ERROR:
       snprintf(buf, len, "ERROR: %s", vm->error_message);
       break;
-    case MJS_TYPE_OBJECT: {
+    case JS_TYPE_OBJECT: {
       int n = snprintf(buf, len, "{");
       struct prop *prop = firstprop(vm, v);
       while (prop != NULL) {
@@ -286,7 +286,7 @@ const char *tostr(struct elk *vm, jsval_t v) {
   return _tos(vm, v, buf, sizeof(buf));
 }
 
-#ifdef MJS_DEBUG
+#ifdef JS_DEBUG
 static void vm_dump(const struct elk *vm) {
   ind_t i;
   printf("[VM] %8s[%4d]: ", "objs", (int) sizeof(vm->objs));
@@ -325,7 +325,7 @@ static void abandon(struct elk *vm, jsval_t v) {
   js_type_t t = js_type(v);
   DEBUG(("%s: %s\n", __func__, tostr(vm, v)));
 
-  if (t != MJS_TYPE_OBJECT && t != MJS_TYPE_STRING && t != MJS_TYPE_FUNCTION)
+  if (t != JS_TYPE_OBJECT && t != JS_TYPE_STRING && t != JS_TYPE_FUNCTION)
     return;
 
   // If this value is still referenced, do nothing
@@ -339,7 +339,7 @@ static void abandon(struct elk *vm, jsval_t v) {
     if (v == vm->data_stack[j]) return;
 
   // vm_dump(vm);
-  if (t == MJS_TYPE_OBJECT) {
+  if (t == JS_TYPE_OBJECT) {
     ind_t i, obj_index = (ind_t) VAL_PAYLOAD(v);
     struct obj *o = &vm->objs[obj_index];
     o->flags = 0;  // Mark object free
@@ -347,12 +347,12 @@ static void abandon(struct elk *vm, jsval_t v) {
     while (i != INVALID_INDEX) {  // Deallocate obj's properties too
       struct prop *prop = &vm->props[i];
       prop->flags = 0;  // Mark property free
-      assert(js_type(prop->key) == MJS_TYPE_STRING);
+      assert(js_type(prop->key) == JS_TYPE_STRING);
       abandon(vm, prop->key);
       abandon(vm, prop->val);
       i = prop->next;  // Point to the next property
     }
-  } else if (t == MJS_TYPE_STRING || t == MJS_TYPE_FUNCTION) {
+  } else if (t == JS_TYPE_STRING || t == JS_TYPE_FUNCTION) {
     ind_t k, j, i = (ind_t) VAL_PAYLOAD(v);     // String begin
     ind_t len = (ind_t)(vm->stringbuf[i] + 2);  // String length
 
@@ -373,10 +373,10 @@ static void abandon(struct elk *vm, jsval_t v) {
         struct prop *prop = &vm->props[j];
         if (prop->flags != 0) continue;
         k = (ind_t) VAL_PAYLOAD(prop->key);
-        if (k > i) prop->key = MK_VAL(MJS_TYPE_STRING, k - len);
-        if (js_type(prop->val) == MJS_TYPE_STRING) {
+        if (k > i) prop->key = MK_VAL(JS_TYPE_STRING, k - len);
+        if (js_type(prop->val) == JS_TYPE_STRING) {
           k = (ind_t) VAL_PAYLOAD(prop->val);
-          if (k > i) prop->key = MK_VAL(MJS_TYPE_STRING, k - len);
+          if (k > i) prop->key = MK_VAL(JS_TYPE_STRING, k - len);
         }
       }
     }
@@ -389,7 +389,7 @@ static jsval_t vm_push(struct elk *vm, jsval_t v) {
     DEBUG(("%s: %s\n", __func__, tostr(vm, v)));
     vm->data_stack[vm->sp] = v;
     vm->sp++;
-    return MJS_TRUE;
+    return JS_TRUE;
   } else {
     return vm_err(vm, "stack overflow");
   }
@@ -400,7 +400,7 @@ static jsval_t vm_drop(struct elk *vm) {
     DEBUG(("%s: %s\n", __func__, tostr(vm, *vm_top(vm))));
     vm->sp--;
     abandon(vm, vm->data_stack[vm->sp]);
-    return MJS_TRUE;
+    return JS_TRUE;
   } else {
     return vm_err(vm, "stack underflow");
   }
@@ -414,7 +414,7 @@ static jsval_t mk_str(struct elk *vm, const char *p, int n) {
   } else if ((size_t) len + 2 > sizeof(vm->stringbuf) - vm->stringbuf_len) {
     return vm_err(vm, "string OOM");
   } else {
-    jsval_t v = MK_VAL(MJS_TYPE_STRING, vm->stringbuf_len);
+    jsval_t v = MK_VAL(JS_TYPE_STRING, vm->stringbuf_len);
     vm->stringbuf[vm->stringbuf_len++] = (uint8_t)(len & 0xff);  // save length
     if (p) memmove(&vm->stringbuf[vm->stringbuf_len], p, len);   // copy data
     vm->stringbuf_len = (ind_t)(vm->stringbuf_len + len);
@@ -430,10 +430,10 @@ char *js_to_str(struct elk *vm, jsval_t v, jslen_t *len) {
 }
 
 static jsval_t js_concat(struct elk *vm, jsval_t v1, jsval_t v2) {
-  jsval_t v = MJS_ERROR;
+  jsval_t v = JS_ERROR;
   jslen_t n1, n2;
   char *p1 = js_to_str(vm, v1, &n1), *p2 = js_to_str(vm, v2, &n2);
-  if ((v = mk_str(vm, NULL, n1 + n2)) != MJS_ERROR) {
+  if ((v = mk_str(vm, NULL, n1 + n2)) != JS_ERROR) {
     char *p = js_to_str(vm, v, NULL);
     memmove(p, p1, n1);
     memmove(p + n1, p2, n2);
@@ -446,7 +446,7 @@ static jsval_t mk_cfunc(struct elk *vm, ind_t i) {
   ind_t i;
   for (i = 0; i < ARRSIZE(vm->cfuncs); i++) {
     if (vm->cfuncs[i].fn != NULL) continue;
-    return MK_VAL(MJS_TYPE_C_FUNCTION, i);
+    return MK_VAL(JS_TYPE_C_FUNCTION, i);
   }
   return vm_err(vm, "cfunc OOM");
 }
@@ -459,16 +459,16 @@ static jsval_t mk_obj(struct elk *vm) {
     if (vm->objs[i].flags != 0) continue;
     vm->objs[i].flags = OBJ_ALLOCATED;
     vm->objs[i].props = INVALID_INDEX;
-    return MK_VAL(MJS_TYPE_OBJECT, i);
+    return MK_VAL(JS_TYPE_OBJECT, i);
   }
   return vm_err(vm, "obj OOM");
 }
 
 static jsval_t mk_func(struct elk *vm, const char *code, int len) {
   jsval_t v = mk_str(vm, code, len);
-  if (v != MJS_ERROR) {
+  if (v != JS_ERROR) {
     v &= ~((jsval_t) 0x0f << 19);
-    v |= (jsval_t) MJS_TYPE_FUNCTION << 19;
+    v |= (jsval_t) JS_TYPE_FUNCTION << 19;
   }
   return v;
 }
@@ -478,7 +478,7 @@ static jsval_t create_scope(struct elk *vm) {
   if (vm->csp >= ARRSIZE(vm->call_stack) - 1) {
     return vm_err(vm, "Call stack OOM");
   }
-  if ((scope = mk_obj(vm)) == MJS_ERROR) return MJS_ERROR;
+  if ((scope = mk_obj(vm)) == JS_ERROR) return JS_ERROR;
   DEBUG(("%s\n", __func__));
   vm->call_stack[vm->csp] = scope;
   vm->csp++;
@@ -492,7 +492,7 @@ static jsval_t delete_scope(struct elk *vm) {
     DEBUG(("%s\n", __func__));
     vm->csp--;
     abandon(vm, vm->call_stack[vm->csp]);
-    return MJS_TRUE;
+    return JS_TRUE;
   }
 }
 
@@ -537,7 +537,7 @@ static jsval_t lookup_and_push(struct elk *vm, const char *ptr, jslen_t len) {
 }
 
 jsval_t js_set(struct elk *vm, jsval_t obj, jsval_t key, jsval_t val) {
-  if (js_type(obj) == MJS_TYPE_OBJECT) {
+  if (js_type(obj) == JS_TYPE_OBJECT) {
     jslen_t len;
     const char *ptr = js_to_str(vm, key, &len);
     struct prop *prop = firstprop(vm, obj);
@@ -549,7 +549,7 @@ jsval_t js_set(struct elk *vm, jsval_t obj, jsval_t key, jsval_t val) {
         jsval_t old = prop->val;
         prop->val = val;
         abandon(vm, old);
-        return MJS_TRUE;
+        return JS_TRUE;
       }
       if (prop->next == INVALID_INDEX) break;
       prop = &vm->props[prop->next];
@@ -580,7 +580,7 @@ jsval_t js_set(struct elk *vm, jsval_t obj, jsval_t key, jsval_t val) {
         p->val = val;
         DEBUG(("%s: prop %hu %s -> ", __func__, i, tostr(vm, key)));
         DEBUG(("%s\n", tostr(vm, val)));
-        return MJS_TRUE;
+        return JS_TRUE;
       }
       return vm_err(vm, "props OOM");
     }
@@ -592,9 +592,9 @@ jsval_t js_set(struct elk *vm, jsval_t obj, jsval_t key, jsval_t val) {
 static int is_true(struct elk *vm, jsval_t v) {
   jslen_t len;
   js_type_t t = js_type(v);
-  return t == MJS_TYPE_TRUE || (t == MJS_TYPE_NUMBER && tof(v) != 0.0) ||
-         t == MJS_TYPE_OBJECT || t == MJS_TYPE_FUNCTION ||
-         (t == MJS_TYPE_STRING && js_to_str(vm, v, &len) && len > 0);
+  return t == JS_TYPE_TRUE || (t == JS_TYPE_NUMBER && tof(v) != 0.0) ||
+         t == JS_TYPE_OBJECT || t == JS_TYPE_FUNCTION ||
+         (t == JS_TYPE_STRING && js_to_str(vm, v, &len) && len > 0);
 }
 
 ////////////////////////////////// TOKENIZER /////////////////////////////////
@@ -875,7 +875,7 @@ static float do_arith_op(float f1, float f2, jsval_t op) {
 static jsval_t do_assign_op(struct elk *vm, jstok_t op) {
   jsval_t *t = vm_top(vm);
   struct prop *prop = &vm->props[(ind_t) tof(t[-1])];
-  if (js_type(prop->val) != MJS_TYPE_NUMBER || js_type(t[0]) != MJS_TYPE_NUMBER)
+  if (js_type(prop->val) != JS_TYPE_NUMBER || js_type(t[0]) != JS_TYPE_NUMBER)
     return vm_err(vm, "please no");
   t[-1] = prop->val = tov(do_arith_op(tof(prop->val), tof(t[0]), op));
   vm_drop(vm);
@@ -884,15 +884,15 @@ static jsval_t do_assign_op(struct elk *vm, jstok_t op) {
 
 static jsval_t do_op(struct parser *p, int op) {
   jsval_t *top = vm_top(p->vm), a = top[-1], b = top[0];
-  if (p->noexec) return MJS_TRUE;
+  if (p->noexec) return JS_TRUE;
   DEBUG(("%s: sp %d op %c %d\n", __func__, p->vm->sp, op, op));
   DEBUG(("    top-1 %s\n", tostr(p->vm, b)));
   DEBUG(("    top-2 %s\n", tostr(p->vm, a)));
   switch (op) {
     case '+':
-      if (js_type(a) == MJS_TYPE_STRING && js_type(b) == MJS_TYPE_STRING) {
+      if (js_type(a) == JS_TYPE_STRING && js_type(b) == JS_TYPE_STRING) {
         jsval_t v = js_concat(p->vm, a, b);
-        if (v == MJS_ERROR) return v;
+        if (v == JS_ERROR) return v;
         vm_drop(p->vm);
         vm_drop(p->vm);
         vm_push(p->vm, v);
@@ -902,7 +902,7 @@ static jsval_t do_op(struct parser *p, int op) {
     case '-': case '*': case '/': case '%': case '^': case '&': case '|':
     case DT('>', '>'): case DT('<', '<'): case TT('>', '>', '>'):
       // clang-format on
-      if (js_type(a) == MJS_TYPE_NUMBER && js_type(b) == MJS_TYPE_NUMBER) {
+      if (js_type(a) == JS_TYPE_NUMBER && js_type(b) == JS_TYPE_NUMBER) {
         jsval_t v = tov(do_arith_op(tof(a), tof(b), op));
         vm_drop(p->vm);
         vm_drop(p->vm);
@@ -928,17 +928,17 @@ static jsval_t do_op(struct parser *p, int op) {
     case TOK_POSTFIX_MINUS:
     case TOK_POSTFIX_PLUS: {
       struct prop *prop = &p->vm->props[(ind_t) tof(b)];
-      if (js_type(prop->val) != MJS_TYPE_NUMBER)
+      if (js_type(prop->val) != JS_TYPE_NUMBER)
         return vm_err(p->vm, "please no");
       top[0] = prop->val;
       prop->val = tov(tof(prop->val) + ((op == TOK_POSTFIX_PLUS) ? 1 : -1));
       break;
     }
     case '!':
-      top[0] = is_true(p->vm, top[0]) ? MJS_FALSE : MJS_TRUE;
+      top[0] = is_true(p->vm, top[0]) ? JS_FALSE : JS_TRUE;
       break;
     case '~':
-      if (js_type(top[0]) != MJS_TYPE_NUMBER) return vm_err(p->vm, "noo");
+      if (js_type(top[0]) != JS_TYPE_NUMBER) return vm_err(p->vm, "noo");
       top[0] = tov((float) (~(long) tof(top[0])));
       break;
     case TOK_UNARY_PLUS:
@@ -958,21 +958,21 @@ static jsval_t do_op(struct parser *p, int op) {
       jsval_t res = js_set(p->vm, obj, a, b);
       top[0] = a;
       top[-1] = b;
-      if (res == MJS_ERROR) return res;
+      if (res == JS_ERROR) return res;
       return vm_drop(p->vm);
     }
 #endif
     default:
       return vm_err(p->vm, "Unknown op: %c (%d)", op, op);
   }
-  return MJS_TRUE;
+  return JS_TRUE;
 }
 
 typedef jsval_t bpf_t(struct parser *p, int prev_op);
 
 static jsval_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
                                const jstok_t *ops, jstok_t prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   TRY(f1(p, TOK_EOF));
   if (prev_op != TOK_EOF) TRY(do_op(p, prev_op));
   if (findtok(ops, p->tok.tok) != TOK_EOF) {
@@ -985,7 +985,7 @@ static jsval_t parse_ltr_binop(struct parser *p, bpf_t f1, bpf_t f2,
 
 static jsval_t parse_rtl_binop(struct parser *p, bpf_t f1, bpf_t f2,
                                const jstok_t *ops, jstok_t prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   (void) prev_op;
   TRY(f1(p, TOK_EOF));
   if (findtok(ops, p->tok.tok) != TOK_EOF) {
@@ -1005,7 +1005,7 @@ static jstok_t lookahead(struct parser *p) {
 }
 
 static jsval_t parse_block(struct parser *p, int mkscope) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   if (mkscope && !p->noexec) TRY(create_scope(p->vm));
   TRY(parse_statement_list(p, '}'));
   EXPECT(p, '}');
@@ -1014,7 +1014,7 @@ static jsval_t parse_block(struct parser *p, int mkscope) {
 }
 
 static jsval_t parse_function(struct parser *p) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   int name_provided = 0;
   struct tok tmp = p->tok;
   DEBUG(("%s: START: [%d]\n", __func__, p->vm->sp));
@@ -1047,7 +1047,7 @@ static jsval_t parse_function(struct parser *p) {
 }
 
 static jsval_t parse_object_literal(struct parser *p) {
-  jsval_t obj = MJS_UNDEFINED, key, val, res = MJS_TRUE;
+  jsval_t obj = JS_UNDEFINED, key, val, res = JS_TRUE;
   pnext(p);
   if (!p->noexec) {
     TRY(mk_obj(p->vm));
@@ -1079,7 +1079,7 @@ static jsval_t parse_object_literal(struct parser *p) {
 }
 
 static jsval_t parse_literal(struct parser *p, jstok_t prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   (void) prev_op;
   switch (p->tok.tok) {
     case TOK_NUM:
@@ -1126,16 +1126,16 @@ static jsval_t parse_literal(struct parser *p, jstok_t prev_op) {
       res = parse_function(p);
       break;
     case TOK_TRUE:
-      res = vm_push(p->vm, MJS_TRUE);
+      res = vm_push(p->vm, JS_TRUE);
       break;
     case TOK_FALSE:
-      res = vm_push(p->vm, MJS_FALSE);
+      res = vm_push(p->vm, JS_FALSE);
       break;
     case TOK_NULL:
-      res = vm_push(p->vm, MJS_NULL);
+      res = vm_push(p->vm, JS_NULL);
       break;
     case TOK_UNDEFINED:
-      res = vm_push(p->vm, MJS_UNDEFINED);
+      res = vm_push(p->vm, JS_UNDEFINED);
       break;
     case '(':
       pnext(p);
@@ -1152,7 +1152,7 @@ static jsval_t parse_literal(struct parser *p, jstok_t prev_op) {
 
 static void setarg(struct parser *p, jsval_t scope, jsval_t val) {
   jsval_t key = mk_str(p->vm, p->tok.ptr, p->tok.len);
-  if (js_type(key) == MJS_TYPE_STRING) js_set(p->vm, scope, key, val);
+  if (js_type(key) == JS_TYPE_STRING) js_set(p->vm, scope, key, val);
   // printf("  setarg: key %s\n", tostr(p->vm, key));
   // printf("  setarg: val %s\n", tostr(p->vm, val));
   // printf("  setarg scope: %s\n", tostr(p->vm, scope));
@@ -1161,7 +1161,7 @@ static void setarg(struct parser *p, jsval_t scope, jsval_t val) {
 }
 
 static jsval_t call_js_function(struct parser *p, jsval_t f) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   ind_t saved_scp = p->vm->csp;
   jsval_t scope;  // Function to call
 
@@ -1190,7 +1190,7 @@ static jsval_t call_js_function(struct parser *p, jsval_t f) {
     vm_drop(p->vm);  // Drop argument value from the data_stack
   }
   // printf(" local scope: %s\n", tostr(p->vm, scope));
-  while (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, MJS_UNDEFINED);
+  while (p2.tok.tok == TOK_IDENT) setarg(&p2, scope, JS_UNDEFINED);
   while (p2.tok.tok != '{' && p2.tok.tok != TOK_EOF) pnext(&p2);
   DEBUG(("%s: [%.*s] args %s\n", __func__, code_len, p2.tok.ptr,
          tostr(p->vm, scope)));
@@ -1873,7 +1873,7 @@ static jsval_t wtoval(struct elk *vm, ffi_word_t w) {
 
 static ffi_word_t valtow(struct elk *vm, jsval_t v) {
   ffi_word_t ret = 0;
-  if (js_type(v) == MJS_TYPE_STRING) {
+  if (js_type(v) == JS_TYPE_STRING) {
     const char *s = js_to_str(vm, v, 0);
     sscanf(s, "%lx", &ret);
   }
@@ -1890,7 +1890,7 @@ static struct cfunc *findcfunc(struct elk *vm, ind_t id) {
 
 static jsval_t call_c_function(struct parser *p, jsval_t f) {
   struct cfunc *cf = findcfunc(p->vm, (ind_t) VAL_PAYLOAD(f));
-  jsval_t res = MJS_UNDEFINED, v = MJS_UNDEFINED, *top = vm_top(p->vm);
+  jsval_t res = JS_UNDEFINED, v = JS_UNDEFINED, *top = vm_top(p->vm);
   struct ffi_arg args[FFI_MAX_ARGS_CNT + 1];  // First arg - return value
   struct fficbparam cbp;                      // For C callbacks only
   int i, num_passed_args = 0, num_expected_args = 0;
@@ -1923,7 +1923,7 @@ static jsval_t call_c_function(struct parser *p, jsval_t f) {
 			case 'u': ffi_set_ptr(arg, &cbp); break;
 			case 's': ffi_set_ptr(arg, js_to_str(p->vm, av, 0)); break;
 			case 'm': ffi_set_ptr(arg, p->vm); break;
-			case 'b': ffi_set_bool(arg, av == MJS_TRUE ? 1 : 0); break;
+			case 'b': ffi_set_bool(arg, av == JS_TRUE ? 1 : 0); break;
 			case 'f': ffi_set_float(arg, tof(av)); break;
 			case 'd': ffi_set_double(arg, (double) tof(av)); break;
 			case 'j': ffi_set_word(arg, (ffi_word_t) av); break;
@@ -1942,8 +1942,8 @@ static jsval_t call_c_function(struct parser *p, jsval_t f) {
 		case 'p': v = wtoval(p->vm, args[0].v.w); break;
 		case 'f': v = tov(args[0].v.f); break;
 		case 'd': v = tov((float) args[0].v.d); break;
-		case 'v': v = MJS_UNDEFINED; break;
-		case 'b': v = args[0].v.i ? MJS_TRUE : MJS_FALSE; break;
+		case 'v': v = JS_UNDEFINED; break;
+		case 'b': v = args[0].v.i ? JS_TRUE : JS_FALSE; break;
 		case 'i': v = tov((float) args[0].v.i); break;
 		default: v = vm_err(p->vm, "bad ret type '%c'", cf->decl[0]); break;
 	}
@@ -1955,7 +1955,7 @@ static jsval_t call_c_function(struct parser *p, jsval_t f) {
 }
 
 static jsval_t parse_call_dot_mem(struct parser *p, int prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   TRY(parse_literal(p, p->tok.tok));
   while (p->tok.tok == '.' || p->tok.tok == '(' || p->tok.tok == '[') {
     // printf("%s: [%.*s]\n", __func__, p->tok.len, p->tok.ptr);
@@ -1968,9 +1968,9 @@ static jsval_t parse_call_dot_mem(struct parser *p, int prev_op) {
       if (!findtok(s_assign_ops, p->tok.tok) &&
           !findtok(s_postfix_ops, p->tok.tok) &&
           !findtok(s_postfix_ops, prev_tok)) {
-        jsval_t v = MJS_UNDEFINED, *top = vm_top(p->vm);
-        if (js_type(top[0]) == MJS_TYPE_NUMBER &&
-            js_type(top[-1]) == MJS_TYPE_STRING) {
+        jsval_t v = JS_UNDEFINED, *top = vm_top(p->vm);
+        if (js_type(top[0]) == JS_TYPE_NUMBER &&
+            js_type(top[-1]) == JS_TYPE_STRING) {
           jslen_t len, idx = tof(top[0]);
           const char *s = js_to_str(p->vm, top[-1], &len);
           if (idx < len) v = mk_str(p->vm, s + idx, 1);
@@ -1992,9 +1992,9 @@ static jsval_t parse_call_dot_mem(struct parser *p, int prev_op) {
       } else {
         jsval_t f = *vm_top(p->vm);
         js_type_t t = js_type(f);
-        if (t == MJS_TYPE_FUNCTION) {
+        if (t == JS_TYPE_FUNCTION) {
           res = call_js_function(p, f);
-        } else if (t == MJS_TYPE_C_FUNCTION) {
+        } else if (t == JS_TYPE_C_FUNCTION) {
           res = call_c_function(p, f);
         } else {
           res = vm_err(p->vm, "calling non-func");
@@ -2007,17 +2007,17 @@ static jsval_t parse_call_dot_mem(struct parser *p, int prev_op) {
       pnext(p);
       if (!p->noexec) {
         if (p->tok.len == 6 && memcmp(p->tok.ptr, "length", 6) == 0 &&
-            js_type(v) == MJS_TYPE_STRING) {
+            js_type(v) == JS_TYPE_STRING) {
           jslen_t len;
           js_to_str(p->vm, v, &len);
           vm_drop(p->vm);
           res = vm_push(p->vm, tov(len));
-        } else if (js_type(v) != MJS_TYPE_OBJECT) {
+        } else if (js_type(v) != JS_TYPE_OBJECT) {
           res = vm_push(p->vm, vm_err(p->vm, "lookup in non-obj"));
         } else {
           jsval_t *prop = findprop(p->vm, v, p->tok.ptr, p->tok.len);
           vm_drop(p->vm);
-          res = vm_push(p->vm, prop == NULL ? MJS_UNDEFINED : *prop);
+          res = vm_push(p->vm, prop == NULL ? JS_UNDEFINED : *prop);
         }
       }
       pnext(p);
@@ -2028,7 +2028,7 @@ static jsval_t parse_call_dot_mem(struct parser *p, int prev_op) {
 }
 
 static jsval_t parse_postfix(struct parser *p, int prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   TRY(parse_call_dot_mem(p, prev_op));
   if (p->tok.tok == DT('+', '+') || p->tok.tok == DT('-', '-')) {
     int op = p->tok.tok == DT('+', '+') ? TOK_POSTFIX_PLUS : TOK_POSTFIX_MINUS;
@@ -2039,7 +2039,7 @@ static jsval_t parse_postfix(struct parser *p, int prev_op) {
 }
 
 static jsval_t parse_unary(struct parser *p, int prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   int op = TOK_EOF;
   if (findtok(s_unary_ops, p->tok.tok) != TOK_EOF) {
     op = p->tok.tok;
@@ -2050,7 +2050,7 @@ static jsval_t parse_unary(struct parser *p, int prev_op) {
   } else {
     res = parse_postfix(p, prev_op);
   }
-  if (res == MJS_ERROR) return res;
+  if (res == JS_ERROR) return res;
   if (op != TOK_EOF) {
     if (op == '-') op = TOK_UNARY_MINUS;
     if (op == '+') op = TOK_UNARY_PLUS;
@@ -2109,7 +2109,7 @@ static jsval_t parse_logical_or(struct parser *p, int prev_op) {
 }
 
 static jsval_t parse_ternary(struct parser *p, int prev_op) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   TRY(parse_logical_or(p, TOK_EOF));
   if (prev_op != TOK_EOF) do_op(p, prev_op);
   if (p->tok.tok == '?') {
@@ -2136,11 +2136,11 @@ static jsval_t parse_expr(struct parser *p) {
 }
 
 static jsval_t parse_let(struct parser *p) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   pnext(p);
   for (;;) {
     struct tok tmp = p->tok;
-    jsval_t obj = p->vm->call_stack[p->vm->csp - 1], key, val = MJS_UNDEFINED;
+    jsval_t obj = p->vm->call_stack[p->vm->csp - 1], key, val = JS_UNDEFINED;
     if (p->tok.tok != TOK_IDENT) return vm_err(p->vm, "indent expected");
     if (findprop(p->vm, obj, p->tok.ptr, p->tok.len) != NULL) {
       return vm_err(p->vm, "[%.*s] already declared", p->tok.len, p->tok.ptr);
@@ -2167,11 +2167,11 @@ static jsval_t parse_let(struct parser *p) {
 }
 
 static jsval_t parse_return(struct parser *p) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   pnext(p);
   // It is either "return;" or "return EXPR;"
   if (p->tok.tok == ';' || p->tok.tok == '}') {
-    if (!p->noexec) vm_push(p->vm, MJS_UNDEFINED);
+    if (!p->noexec) vm_push(p->vm, JS_UNDEFINED);
   } else {
     res = parse_expr(p);
   }
@@ -2189,7 +2189,7 @@ static jsval_t parse_block_or_stmt(struct parser *p, int create_scope) {
 }
 
 static jsval_t parse_while(struct parser *p) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   struct parser tmp;
   pnext(p);
   EXPECT(p, '(');
@@ -2220,7 +2220,7 @@ static jsval_t parse_while(struct parser *p) {
 }
 
 static jsval_t parse_if(struct parser *p) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   int saved_noexec = p->noexec, cond;
   pnext(p);
   EXPECT(p, '(');
@@ -2232,7 +2232,7 @@ static jsval_t parse_if(struct parser *p) {
     cond = is_true(p->vm, *vm_top(p->vm));
     vm_drop(p->vm);
     if (!cond) {
-      vm_push(p->vm, MJS_UNDEFINED);
+      vm_push(p->vm, JS_UNDEFINED);
       p->noexec++;
     }
   }
@@ -2245,7 +2245,7 @@ static jsval_t parse_statement(struct parser *p) {
   switch (p->tok.tok) {
     case ';':
       pnext(p);
-      return MJS_TRUE;
+      return JS_TRUE;
     case TOK_LET:
       return parse_let(p);
     case '{': {
@@ -2260,8 +2260,8 @@ static jsval_t parse_statement(struct parser *p) {
 // clang-format off
 #if 0
     case TOK_FOR: return parse_for(p);
-    case TOK_BREAK: pnext1(p); return MJS_SUCCESS;
-    case TOK_CONTINUE: pnext1(p); return MJS_SUCCESS;
+    case TOK_BREAK: pnext1(p); return JS_SUCCESS;
+    case TOK_CONTINUE: pnext1(p); return JS_SUCCESS;
 #endif
     case TOK_IF: return parse_if(p);
     case TOK_CASE: case TOK_CATCH: case TOK_DELETE: case TOK_DO:
@@ -2270,7 +2270,7 @@ static jsval_t parse_statement(struct parser *p) {
       // clang-format on
       return vm_err(p->vm, "[%.*s] not implemented", p->tok.len, p->tok.ptr);
     default: {
-      jsval_t res = MJS_TRUE;
+      jsval_t res = JS_TRUE;
       for (;;) {
         TRY(parse_expr(p));
         if (p->tok.tok != ',') break;
@@ -2282,11 +2282,11 @@ static jsval_t parse_statement(struct parser *p) {
 }
 
 static jsval_t parse_statement_list(struct parser *p, jstok_t endtok) {
-  jsval_t res = MJS_TRUE;
+  jsval_t res = JS_TRUE;
   pnext(p);
   DEBUG(("%s: tok %c endtok %c\n", __func__, p->tok.tok, endtok));
   // printf(" ---> [%s]\n", p->tok.ptr);
-  while (res != MJS_ERROR && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
+  while (res != JS_ERROR && p->tok.tok != TOK_EOF && p->tok.tok != endtok) {
     if (!p->noexec && p->vm->sp > 0) vm_drop(p->vm);
     res = parse_statement(p);
 #if 0
@@ -2297,7 +2297,7 @@ static jsval_t parse_statement_list(struct parser *p, jstok_t endtok) {
 #endif
     while (p->tok.tok == ';') pnext(p);
   }
-  if (!p->noexec && p->vm->sp == 0) vm_push(p->vm, MJS_UNDEFINED);
+  if (!p->noexec && p->vm->sp == 0) vm_push(p->vm, JS_UNDEFINED);
   return res;
 }
 
@@ -2307,7 +2307,7 @@ struct elk *js_create(void) {
   struct elk *vm = (struct elk *) calloc(1, sizeof(*vm));
   vm->objs[0].flags = OBJ_ALLOCATED;
   vm->objs[0].props = INVALID_INDEX;
-  vm->call_stack[0] = MK_VAL(MJS_TYPE_OBJECT, 0);
+  vm->call_stack[0] = MK_VAL(JS_TYPE_OBJECT, 0);
   vm->csp++;
   DEBUG(("%s: size %d bytes\n", __func__, (int) sizeof(*vm)));
   return vm;
@@ -2319,9 +2319,9 @@ void js_destroy(struct elk *vm) {
 
 jsval_t js_eval(struct elk *vm, const char *buf, int len) {
   struct parser p = mk_parser(vm, buf, len > 0 ? len : (int) strlen(buf));
-  jsval_t v = MJS_ERROR;
+  jsval_t v = JS_ERROR;
   vm->error_message[0] = '\0';
-  if (parse_statement_list(&p, TOK_EOF) != MJS_ERROR && vm->sp == 1) {
+  if (parse_statement_list(&p, TOK_EOF) != JS_ERROR && vm->sp == 1) {
     v = *vm_top(vm);
   } else if (vm->error_message[0] == '\0') {
     v = vm_err(vm, "stack %d", vm->sp);
@@ -2336,7 +2336,7 @@ static void addcfn(struct elk *vm, jsval_t obj, struct cfunc *cf) {
   vm->cfuncs = cf;        // of all ffi-ed functions
   cf->id = vm->cfunc_count++;  // Assign a unique ID
   js_set(vm, obj, js_mk_str(vm, cf->name, -1),
-         MK_VAL(MJS_TYPE_C_FUNCTION, cf->id));  // Add to the object
+         MK_VAL(JS_TYPE_C_FUNCTION, cf->id));  // Add to the object
 }
 
 #define js_ffi(vm, fn, decl)                                  \
@@ -2345,4 +2345,4 @@ static void addcfn(struct elk *vm, jsval_t obj, struct cfunc *cf) {
     addcfn((vm), js_get_global(vm), &x);                      \
   } while (0)
 
-#endif  // MJS_H
+#endif  // JS_H

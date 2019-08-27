@@ -38,15 +38,15 @@ static int g_num_checks;
 
 static bool check_num(struct elk *vm, jsval_t v, float expected) {
   // printf("%s: %g %g\n", __func__, tof(v), expected);
-  if (js_type(v) == MJS_TYPE_ERROR) printf("ERROR: %s\n", vm->error_message);
-  return js_type(v) == MJS_TYPE_NUMBER &&
+  if (js_type(v) == JS_TYPE_ERROR) printf("ERROR: %s\n", vm->error_message);
+  return js_type(v) == JS_TYPE_NUMBER &&
          fabs(js_to_float(v) - expected) < 0.0001;
 }
 
 static int check_str(struct elk *vm, jsval_t v, const char *expected) {
   jslen_t len;
   const char *p = js_to_str(vm, v, &len);
-  return js_type(v) == MJS_TYPE_STRING && len == strlen(expected) &&
+  return js_type(v) == JS_TYPE_STRING && len == strlen(expected) &&
          memcmp(p, expected, len) == 0;
 }
 
@@ -57,7 +57,7 @@ static bool numexpr(struct elk *vm, const char *code, float expected) {
 static int strexpr(struct elk *vm, const char *code, const char *expected) {
   jsval_t v = js_eval(vm, code, strlen(code));
   // printf("%s: %s\n", __func__, tostr(vm, v));
-  return js_type(v) != MJS_TYPE_STRING ? 0 : check_str(vm, v, expected);
+  return js_type(v) != JS_TYPE_STRING ? 0 : check_str(vm, v, expected);
 }
 
 static int typeexpr(struct elk *vm, const char *code, js_type_t t) {
@@ -68,11 +68,11 @@ static int typeexpr(struct elk *vm, const char *code, js_type_t t) {
 static const char *test_expr(void) {
   struct elk *vm = js_create();
 
-  ASSERT(js_eval(vm, ";;;", -1) == MJS_UNDEFINED);
-  ASSERT(js_eval(vm, "let a", -1) == MJS_UNDEFINED);
-  ASSERT(js_eval(vm, "let a", -1) == MJS_ERROR);
-  ASSERT(typeexpr(vm, "let ax, bx = function(x){}", MJS_TYPE_FUNCTION));
-  ASSERT(typeexpr(vm, "let ay, by = function(x){}, c", MJS_TYPE_UNDEFINED));
+  ASSERT(js_eval(vm, ";;;", -1) == JS_UNDEFINED);
+  ASSERT(js_eval(vm, "let a", -1) == JS_UNDEFINED);
+  ASSERT(js_eval(vm, "let a", -1) == JS_ERROR);
+  ASSERT(typeexpr(vm, "let ax, bx = function(x){}", JS_TYPE_FUNCTION));
+  ASSERT(typeexpr(vm, "let ay, by = function(x){}, c", JS_TYPE_UNDEFINED));
 
   ASSERT(numexpr(vm, "let aq = 1;", 1.0f));
   ASSERT(numexpr(vm, "let aw = 1, be = 2;", 2.0f));
@@ -143,10 +143,10 @@ static const char *test_expr(void) {
   ASSERT(numexpr(vm, "{let a = 6; a |= 3; a}", 7));
   ASSERT(numexpr(vm, "{let a = 6; a ^= 3; a}", 5));
 
-  ASSERT(js_eval(vm, "!0", -1) == MJS_TRUE);
-  ASSERT(js_eval(vm, "!1", -1) == MJS_FALSE);
-  ASSERT(js_eval(vm, "!''", -1) == MJS_TRUE);
-  ASSERT(js_eval(vm, "!false", -1) == MJS_TRUE);
+  ASSERT(js_eval(vm, "!0", -1) == JS_TRUE);
+  ASSERT(js_eval(vm, "!1", -1) == JS_FALSE);
+  ASSERT(js_eval(vm, "!''", -1) == JS_TRUE);
+  ASSERT(js_eval(vm, "!false", -1) == JS_TRUE);
   ASSERT(numexpr(vm, "~10", -11));
   ASSERT(numexpr(vm, "-100", -100));
   ASSERT(numexpr(vm, "+100", 100));
@@ -247,10 +247,10 @@ static const char *test_scopes(void) {
   ASSERT(!(vm->objs[1].flags & OBJ_ALLOCATED));
   ASSERT(!(vm->props[0].flags & PROP_ALLOCATED));
   CHECK_NUMERIC("if (1) 2", 2);
-  ASSERT(js_eval(vm, "if (0) 2;", -1) == MJS_UNDEFINED);
+  ASSERT(js_eval(vm, "if (0) 2;", -1) == JS_UNDEFINED);
   CHECK_NUMERIC("{let a = 42; }", 42);
   CHECK_NUMERIC("let a = 1, b = 2; { let a = 3; b += a; } b;", 5);
-  ASSERT(js_eval(vm, "{}", -1) == MJS_UNDEFINED);
+  ASSERT(js_eval(vm, "{}", -1) == JS_UNDEFINED);
   js_destroy(vm);
   return NULL;
 }
@@ -259,11 +259,11 @@ static const char *test_if(void) {
   struct elk *vm = js_create();
   // printf("---> %s\n", js_stringify(vm, js_eval(vm, "if (true) 1", -1)));
   ASSERT(numexpr(vm, "if (true) 1;", 1.0f));
-  ASSERT(js_eval(vm, "if (0) 1;", -1) == MJS_UNDEFINED);
-  ASSERT(js_eval(vm, "true", -1) == MJS_TRUE);
-  ASSERT(js_eval(vm, "false", -1) == MJS_FALSE);
-  ASSERT(js_eval(vm, "null", -1) == MJS_NULL);
-  ASSERT(js_eval(vm, "undefined", -1) == MJS_UNDEFINED);
+  ASSERT(js_eval(vm, "if (0) 1;", -1) == JS_UNDEFINED);
+  ASSERT(js_eval(vm, "true", -1) == JS_TRUE);
+  ASSERT(js_eval(vm, "false", -1) == JS_FALSE);
+  ASSERT(js_eval(vm, "null", -1) == JS_NULL);
+  ASSERT(js_eval(vm, "undefined", -1) == JS_UNDEFINED);
   CHECK_NUMERIC("if (1) {2;}", 2);
   js_destroy(vm);
   return NULL;
@@ -273,7 +273,7 @@ static const char *test_function(void) {
   ind_t len;
   struct elk *vm = js_create();
   ASSERT(js_eval(vm, "let a = function(x){ return; }; a();", -1) ==
-         MJS_UNDEFINED);
+         JS_UNDEFINED);
   CHECK_NUMERIC("let f = function(){ 1; }; 1;", 1);
   CHECK_NUMERIC("let fx = function(a){ return a; }; 1;", 1);
   CHECK_NUMERIC("let fy = function(a){ return a; }; fy(5);", 5);
@@ -286,7 +286,7 @@ static const char *test_function(void) {
   CHECK_NUMERIC("let f5 = function(a,b){ return b; }; f5(1,2);", 2);
   // TODO
   // ASSERT(js_eval(vm, "(function(a,b){return b;})(1);", -1) ==
-  // MJS_UNDEFINED);
+  // JS_UNDEFINED);
   ASSERT(strexpr(vm, "let f6 = function(x){return typeof(x);}; f6(f5);",
                  "function"));
 
@@ -308,9 +308,9 @@ static const char *test_function(void) {
 
 static const char *test_objects(void) {
   struct elk *vm = js_create();
-  ASSERT(typeexpr(vm, "let o = {}; o", MJS_TYPE_OBJECT));
-  ASSERT(typeexpr(vm, "let o2 = {a:1}; o2", MJS_TYPE_OBJECT));
-  ASSERT(js_eval(vm, "let o3 = {}; o3.b", -1) == MJS_UNDEFINED);
+  ASSERT(typeexpr(vm, "let o = {}; o", JS_TYPE_OBJECT));
+  ASSERT(typeexpr(vm, "let o2 = {a:1}; o2", JS_TYPE_OBJECT));
+  ASSERT(js_eval(vm, "let o3 = {}; o3.b", -1) == JS_UNDEFINED);
   CHECK_NUMERIC("let o4 = {a:1,b:2}; o4.a", 1);
   js_destroy(vm);
   return NULL;
@@ -398,18 +398,18 @@ static const char *test_ffi(void) {
   {
     struct elk *vm = js_create();
     js_ffi(vm, xx, "bl");
-    ASSERT(js_eval(vm, "xx(0);", -1) == MJS_ERROR);
+    ASSERT(js_eval(vm, "xx(0);", -1) == JS_ERROR);
     js_destroy(vm);
   }
   {
     struct elk *vm = js_create();
     js_ffi(vm, xx, "lb");
-    ASSERT(js_eval(vm, "xx(0);", -1) == MJS_ERROR);
+    ASSERT(js_eval(vm, "xx(0);", -1) == JS_ERROR);
     js_destroy(vm);
   }
 
   js_ffi(vm, jslog, "vs");
-  ASSERT(js_eval(vm, "jslog('ffi js/c ok');", -1) == MJS_UNDEFINED);
+  ASSERT(js_eval(vm, "jslog('ffi js/c ok');", -1) == JS_UNDEFINED);
 
   js_ffi(vm, gi, "ipi");
   js_ffi(vm, gu8, "ipi");
@@ -425,15 +425,15 @@ static const char *test_ffi(void) {
       120);
 
   js_ffi(vm, fb, "b");
-  ASSERT(js_eval(vm, "fb();", -1) == MJS_TRUE);
+  ASSERT(js_eval(vm, "fb();", -1) == JS_TRUE);
 
   js_ffi(vm, fbiiiii, "biiiii");
-  ASSERT(js_eval(vm, "fbiiiii(1,1,1,1,1);", -1) == MJS_TRUE);
-  ASSERT(js_eval(vm, "fbiiiii(1,-1,1,-1,0);", -1) == MJS_FALSE);
+  ASSERT(js_eval(vm, "fbiiiii(1,1,1,1,1);", -1) == JS_TRUE);
+  ASSERT(js_eval(vm, "fbiiiii(1,-1,1,-1,0);", -1) == JS_FALSE);
 
   js_ffi(vm, fbd, "bd");
-  ASSERT(js_eval(vm, "fbd(3.15);", -1) == MJS_TRUE);
-  ASSERT(js_eval(vm, "fbd(3.13);", -1) == MJS_FALSE);
+  ASSERT(js_eval(vm, "fbd(3.15);", -1) == JS_TRUE);
+  ASSERT(js_eval(vm, "fbd(3.13);", -1) == JS_FALSE);
 
   js_ffi(vm, pi, "f");
   ASSERT(numexpr(vm, "pi() * 2;", 6.2831852));
@@ -462,9 +462,9 @@ static const char *test_ffi(void) {
 
 static const char *test_subscript(void) {
   struct elk *vm = js_create();
-  ASSERT(js_eval(vm, "123[0]", -1) == MJS_ERROR);
-  ASSERT(js_eval(vm, "'abc'[-1]", -1) == MJS_UNDEFINED);
-  ASSERT(js_eval(vm, "'abc'[3]", -1) == MJS_UNDEFINED);
+  ASSERT(js_eval(vm, "123[0]", -1) == JS_ERROR);
+  ASSERT(js_eval(vm, "'abc'[-1]", -1) == JS_UNDEFINED);
+  ASSERT(js_eval(vm, "'abc'[3]", -1) == JS_UNDEFINED);
   ASSERT(strexpr(vm, "'abc'[0]", "a"));
   ASSERT(strexpr(vm, "'abc'[1]", "b"));
   ASSERT(strexpr(vm, "'abc'[2]", "c"));
@@ -474,7 +474,7 @@ static const char *test_subscript(void) {
 
 static const char *test_notsupported(void) {
   struct elk *vm = js_create();
-  ASSERT(js_eval(vm, "void", -1) == MJS_ERROR);
+  ASSERT(js_eval(vm, "void", -1) == JS_ERROR);
   js_destroy(vm);
   return NULL;
 }

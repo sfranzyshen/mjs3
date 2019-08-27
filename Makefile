@@ -1,7 +1,7 @@
 PROG = elk
 DBG ?=
-#MFLAGS += -DMJS_DEBUG
-TFLAGS += -DMJS_STRING_POOL_SIZE=512
+#MFLAGS += -DJS_DEBUG
+TFLAGS += -DJS_STRING_POOL_SIZE=512
 CFLAGS += -W -Wall -Werror -Wstrict-overflow -fno-strict-aliasing -Os -g
 GCOV ?= true
 
