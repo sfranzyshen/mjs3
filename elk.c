@@ -411,7 +411,7 @@ static jsval_t mk_str(struct elk *vm, const char *p, int n) {
   // printf("%s [%.*s], %d\n", __func__, n, p, (int) vm->stringbuf_len);
   if (len > 0xff) {
     return vm_err(vm, "string is too long");
-  } else if (len + 2 > sizeof(vm->stringbuf) - vm->stringbuf_len) {
+  } else if ((size_t) len + 2 > sizeof(vm->stringbuf) - vm->stringbuf_len) {
     return vm_err(vm, "string OOM");
   } else {
     jsval_t v = MK_VAL(MJS_TYPE_STRING, vm->stringbuf_len);
