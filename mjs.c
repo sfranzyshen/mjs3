@@ -63,20 +63,19 @@ typedef unsigned char uint8_t;
 #define STRINGIFY(x) _STRINGIFY(x)
 #define __func__ __FILE__ ":" STRINGIFY(__LINE__)
 #pragma warning(disable : 4127)
+#pragma warning(disable : 4702)
 #endif
 
 #define mjs vm  // Aliasing `struct mjs` to `struct vm`
 
-typedef uint32_t mjs_val_t;         // JS value placeholder
+typedef uint32_t tok_t;
+typedef uint32_t val_t;             // JS value placeholder
 typedef uint32_t mjs_len_t;         // String length placeholder
 typedef void (*mjs_cfn_t)(void);    // Native C function, for exporting to JS
-// typedef enum { CT_FLOAT = 0, CT_CHAR_PTR = 1 } mjs_ctype_t;  // C FFI types
 
-typedef mjs_val_t val_t;
 typedef mjs_len_t len_t;
 typedef mjs_cfn_t cfn_t;
 typedef uint16_t ind_t;
-typedef uint32_t tok_t;
 #define INVALID_INDEX ((ind_t) ~0)
 
 struct mjs *mjs_create(void);            // Create instance
@@ -84,7 +83,7 @@ void mjs_destroy(struct mjs *);          // Destroy instance
 val_t mjs_get_global(struct mjs *);      // Get global namespace object
 val_t mjs_eval(struct mjs *, const char *buf, int len);  // Evaluate expr
 val_t mjs_set(struct vm *, val_t obj, val_t key, val_t val);  // Set attribute
-const char *mjs_stringify(struct mjs *, val_t v);             // Stringify value
+const char *mjs_stringify(struct mjs *, val_t v);             // Stringify
 unsigned long mjs_size(void);                          // Get VM size
 
 // Converting from C type to val_t
@@ -1892,7 +1891,7 @@ static struct cfunc *findcfunc(struct vm *vm, ind_t id) {
 }
 
 static val_t call_c_function(struct parser *p, val_t f) {
-  struct cfunc *cf = findcfunc(p->vm, f);
+  struct cfunc *cf = findcfunc(p->vm, (ind_t) VAL_PAYLOAD(f));
   val_t res = MJS_UNDEFINED, v = MJS_UNDEFINED, *top = vm_top(p->vm);
   struct ffi_arg args[FFI_MAX_ARGS_CNT + 1];  // First arg - return value
   struct fficbparam cbp;                      // For C callbacks only
@@ -2336,8 +2335,8 @@ static void addcfn(struct vm *vm, val_t obj, struct cfunc *cf) {
   cf->next = vm->cfuncs;  // Link to the list
   vm->cfuncs = cf;        // of all ffi-ed functions
   cf->id = vm->cfunc_count++;  // Assign a unique ID
-  val_t val = MK_VAL(MJS_TYPE_C_FUNCTION, cf->id);  // Create JS value
-  mjs_set(vm, obj, mjs_mk_str(vm, cf->name, -1), val);  // Add to the object
+  mjs_set(vm, obj, mjs_mk_str(vm, cf->name, -1),
+          MK_VAL(MJS_TYPE_C_FUNCTION, cf->id));  // Add to the object
 }
 
 #define mjs_ffi(vm, fn, decl)                                 \

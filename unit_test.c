@@ -36,14 +36,14 @@
 
 static int g_num_checks;
 
-static bool check_num(struct mjs *mjs, mjs_val_t v, float expected) {
+static bool check_num(struct mjs *mjs, val_t v, float expected) {
   // printf("%s: %g %g\n", __func__, tof(v), expected);
   if (mjs_type(v) == MJS_TYPE_ERROR) printf("ERROR: %s\n", mjs->error_message);
   return mjs_type(v) == MJS_TYPE_NUMBER &&
          fabs(mjs_to_float(v) - expected) < 0.0001;
 }
 
-static int check_str(struct mjs *mjs, mjs_val_t v, const char *expected) {
+static int check_str(struct mjs *mjs, val_t v, const char *expected) {
   mjs_len_t len;
   const char *p = mjs_to_str(mjs, v, &len);
   return mjs_type(v) == MJS_TYPE_STRING && len == strlen(expected) &&
@@ -55,13 +55,13 @@ static bool numexpr(struct mjs *mjs, const char *code, float expected) {
 }
 
 static int strexpr(struct mjs *mjs, const char *code, const char *expected) {
-  mjs_val_t v = mjs_eval(mjs, code, strlen(code));
+  val_t v = mjs_eval(mjs, code, strlen(code));
   // printf("%s: %s\n", __func__, tostr(mjs, v));
   return mjs_type(v) != MJS_TYPE_STRING ? 0 : check_str(mjs, v, expected);
 }
 
 static int typeexpr(struct mjs *mjs, const char *code, mjs_type_t t) {
-  mjs_val_t v = mjs_eval(mjs, code, strlen(code));
+  val_t v = mjs_eval(mjs, code, strlen(code));
   return mjs_type(v) == t;
 }
 
