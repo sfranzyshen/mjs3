@@ -340,16 +340,16 @@ static int callcb(int (*cb)(int, int, void *), void *arg) {
   return cb(2, 3, arg);
 }
 
-static bool fb(void) {
-  return true;
-}
-
 static bool fbd(double x) {
   return x > 3.14;
 }
 
 static bool fbiiiii(int n1, int n2, int n3, int n4, int n5) {
   return n1 + n2 + n3 + n4 + n5;
+}
+
+static bool fb(void) {
+  return true;
 }
 
 struct foo {
@@ -359,15 +359,15 @@ struct foo {
   int len;
 };
 
-static int getint(void *base, int offset) {
+static int gi(void *base, int offset) {
   return *(int *) ((char *) base + offset);
 }
 
-static void *getptr(void *base, int offset) {
+static void *gp(void *base, int offset) {
   return *(void **) ((char *) base + offset);
 }
 
-static int getu8(void *base, int offset) {
+static int gu8(void *base, int offset) {
   // printf("%s --> %p %d\n", __func__, base, offset);
   return *((unsigned char *) base + offset);
 }
@@ -378,80 +378,82 @@ static int cb1(int (*cb)(struct foo *, void *), void *arg) {
   return cb(&foo, arg);
 }
 
-static bool xx(bool arg) {
-  return !arg;
-}
-
 static void jslog(const char *s) {
   // printf("%s\n", s);
   (void) s;
 }
 
+static bool xx(bool arg) {
+  return !arg;
+}
+
 static const char *test_ffi(void) {
   struct mjs *mjs = mjs_create();
 
-  ASSERT(mjs_ffi(mjs, "str", (cfn_t) tostr, "smj") == MJS_TRUE);
-  ASSERT(mjs_ffi(mjs, "xx", (cfn_t) xx, "bb") == MJS_TRUE);
+  mjs_ffi(mjs, tostr, "smj");
+  mjs_ffi(mjs, xx, "bb");
   CHECK_NUMERIC("xx(true) ? 2 : 3;", 3);
   CHECK_NUMERIC("xx(false) ? 2 : 3;", 2);
 
   {
     struct mjs *vm = mjs_create();
-    ASSERT(mjs_ffi(vm, "a", (cfn_t) xx, "bl") == MJS_TRUE);
-    ASSERT(mjs_eval(mjs, "a(0);", -1) == MJS_ERROR);
-    ASSERT(mjs_ffi(vm, "b", (cfn_t) xx, "lb") == MJS_TRUE);
-    ASSERT(mjs_eval(mjs, "f(0);", -1) == MJS_ERROR);
+    mjs_ffi(vm, xx, "bl");
+    ASSERT(mjs_eval(vm, "xx(0);", -1) == MJS_ERROR);
+    mjs_destroy(vm);
+  }
+  {
+    struct mjs *vm = mjs_create();
+    mjs_ffi(vm, xx, "lb");
+    ASSERT(mjs_eval(vm, "xx(0);", -1) == MJS_ERROR);
     mjs_destroy(vm);
   }
 
-  ASSERT(mjs_ffi(mjs, "log", (cfn_t) jslog, "vs") == MJS_TRUE);
-  ASSERT(mjs_eval(mjs, "log('ffi js/c ok');", -1) == MJS_UNDEFINED);
+  mjs_ffi(mjs, jslog, "vs");
+  ASSERT(mjs_eval(mjs, "jslog('ffi js/c ok');", -1) == MJS_UNDEFINED);
 
-  ASSERT(mjs_ffi(mjs, "gi", (cfn_t) getint, "ipi") == MJS_TRUE);
-  ASSERT(mjs_ffi(mjs, "gu8", (cfn_t) getu8, "ipi") == MJS_TRUE);
-  ASSERT(mjs_ffi(mjs, "gp", (cfn_t) getptr, "ppi") == MJS_TRUE);
-
-  ASSERT(mjs_ffi(mjs, "f2", (cfn_t) fb, "b") == MJS_TRUE);
-  ASSERT(mjs_eval(mjs, "f2();", -1) == MJS_TRUE);
-
-  ASSERT(mjs_ffi(mjs, "f3", (cfn_t) fbiiiii, "biiiii") == MJS_TRUE);
-  ASSERT(mjs_eval(mjs, "f3(1,1,1,1,1);", -1) == MJS_TRUE);
-  ASSERT(mjs_eval(mjs, "f3(1,-1,1,-1,0);", -1) == MJS_FALSE);
-
-  ASSERT(mjs_ffi(mjs, "f4", (cfn_t) fbd, "bd") == MJS_TRUE);
-  ASSERT(mjs_eval(mjs, "f4(3.15);", -1) == MJS_TRUE);
-  ASSERT(mjs_eval(mjs, "f4(3.13);", -1) == MJS_FALSE);
-
-  ASSERT(mjs_ffi(mjs, "f1", (cfn_t) cb1, "i[ipu]u") == MJS_TRUE);
-  // printf("%lu %lu\n", offsetof(struct foo, data), offsetof(struct foo, x));
+  mjs_ffi(mjs, gi, "ipi");
+  mjs_ffi(mjs, gu8, "ipi");
+  mjs_ffi(mjs, gp, "ppi");
+  mjs_ffi(mjs, cb1, "i[ipu]u");
   CHECK_NUMERIC(
-      "f1(function(a,b){"
+      "cb1(function(a,b){"
       "let p = gp(a,0); return gi(a,0) + gu8(a,4);},0);",
       5);
   CHECK_NUMERIC(
-      "f1(function(a){let x = gp(a,8); "
+      "cb1(function(a){let x = gp(a,8); "
       "return gi(a,0) + gu8(a,4) + gu8(x, 0); },0)",
       120);
 
-  ASSERT(mjs_ffi(mjs, "pi", (cfn_t) pi, "f") == MJS_TRUE);
+  mjs_ffi(mjs, fb, "b");
+  ASSERT(mjs_eval(mjs, "fb();", -1) == MJS_TRUE);
+
+  mjs_ffi(mjs, fbiiiii, "biiiii");
+  ASSERT(mjs_eval(mjs, "fbiiiii(1,1,1,1,1);", -1) == MJS_TRUE);
+  ASSERT(mjs_eval(mjs, "fbiiiii(1,-1,1,-1,0);", -1) == MJS_FALSE);
+
+  mjs_ffi(mjs, fbd, "bd");
+  ASSERT(mjs_eval(mjs, "fbd(3.15);", -1) == MJS_TRUE);
+  ASSERT(mjs_eval(mjs, "fbd(3.13);", -1) == MJS_FALSE);
+
+  mjs_ffi(mjs, pi, "f");
   ASSERT(numexpr(mjs, "pi() * 2;", 6.2831852));
 
-  ASSERT(mjs_ffi(mjs, "sub", (cfn_t) sub, "fff") == MJS_TRUE);
+  mjs_ffi(mjs, sub, "fff");
   ASSERT(numexpr(mjs, "sub(1.17,3.12);", -1.95));
   ASSERT(numexpr(mjs, "sub(0, 0xff);", -255));
   ASSERT(numexpr(mjs, "sub(0xffffff, 0);", 0xffffff));
   ASSERT(numexpr(mjs, "sub(pi(), 0);", 3.1415926f));
 
-  ASSERT(mjs_ffi(mjs, "fmt", (cfn_t) fmt, "ssf") == MJS_TRUE);
+  mjs_ffi(mjs, fmt, "ssf");
   ASSERT(strexpr(mjs, "fmt('%.2f', pi());", "3.14"));
 
-  ASSERT(mjs_ffi(mjs, "mul", (cfn_t) mul, "ddd") == MJS_TRUE);
+  mjs_ffi(mjs, mul, "ddd");
   ASSERT(numexpr(mjs, "mul(1.323, 7.321)", 9.685683f));
 
-  mjs_ffi(mjs, "ccb", (cfn_t) callcb, "i[iiiu]u");
-  ASSERT(numexpr(mjs, "ccb(function(a,b,c){return a+b;}, 123);", 5));
+  mjs_ffi(mjs, callcb, "i[iiiu]u");
+  ASSERT(numexpr(mjs, "callcb(function(a,b,c){return a+b;}, 123);", 5));
 
-  mjs_ffi(mjs, "strlen", (cfn_t) strlen, "is");
+  mjs_ffi(mjs, strlen, "is");
   ASSERT(numexpr(mjs, "strlen('abc')", 3));
 
   mjs_destroy(mjs);
@@ -488,21 +490,21 @@ static const char *test_comments(void) {
 static const char *test_stringify(void) {
   struct mjs *mjs = mjs_create();
   const char *expected;
-  mjs_ffi(mjs, "str", (cfn_t) tostr, "smj");
+  mjs_ffi(mjs, tostr, "smj");
   expected = "{\"a\":1,\"b\":3.14}";
-  ASSERT(strexpr(mjs, "str(0,{a:1,b:3.14});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:1,b:3.14});", expected));
   expected = "{\"a\":true,\"b\":false}";
-  ASSERT(strexpr(mjs, "str(0,{a:true,b:false});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:true,b:false});", expected));
   expected = "{\"a\":\"function(){}\"}";
-  ASSERT(strexpr(mjs, "str(0,{a:function(){}});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:function(){}});", expected));
   expected = "{\"a\":cfunc}";
-  ASSERT(strexpr(mjs, "str(0,{a:str});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:tostr});", expected));
   expected = "{\"a\":null}";
-  ASSERT(strexpr(mjs, "str(0,{a:null});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:null});", expected));
   expected = "{\"a\":undefined}";
-  ASSERT(strexpr(mjs, "str(0,{a:undefined});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:undefined});", expected));
   expected = "{\"a\":\"b\"}";
-  ASSERT(strexpr(mjs, "str(0,{a:'b'});", expected));
+  ASSERT(strexpr(mjs, "tostr(0,{a:'b'});", expected));
   mjs_destroy(mjs);
   return NULL;
 }

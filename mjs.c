@@ -34,10 +34,6 @@
 #define MJS_PROP_POOL_SIZE 30
 #endif
 
-#ifndef MJS_CFUNC_POOL_SIZE
-#define MJS_CFUNC_POOL_SIZE 10
-#endif
-
 #ifndef MJS_ERROR_MESSAGE_SIZE
 #define MJS_ERROR_MESSAGE_SIZE 40
 #endif
@@ -173,8 +169,11 @@ struct obj {
 #define OBJ_CALL_ARGS 2  // This oject sits in the call stack, holds call args
 
 struct cfunc {
-  cfn_t fn;           // Pointer to C function
+  const char *name;   // function name
   const char *decl;   // Declaration of return values and arguments
+  cfn_t fn;           // Pointer to C function
+  ind_t id;           // Function ID
+  struct cfunc *next;  // Next in a chain
 };
 
 struct vm {
@@ -186,8 +185,9 @@ struct vm {
   ind_t stringbuf_len;                    // String pool current length
   struct obj objs[MJS_OBJ_POOL_SIZE];     // Objects pool
   struct prop props[MJS_PROP_POOL_SIZE];  // Props pool
-  struct cfunc cfuncs[MJS_CFUNC_POOL_SIZE];  // C functions pool
   uint8_t stringbuf[MJS_STRING_POOL_SIZE];   // String pool
+  struct cfunc *cfuncs;                      // Registered FFI-ed functions
+  ind_t cfunc_count;                         // Number of FFI-ed functions
 };
 
 #define ARRSIZE(x) ((sizeof(x) / sizeof((x)[0])))
@@ -303,11 +303,6 @@ static void vm_dump(const struct vm *vm) {
   printf("[VM] %8s[%4d]: ", "props", (int) sizeof(vm->props));
   for (i = 0; i < ARRSIZE(vm->props); i++) {
     putchar(vm->props[i].flags ? 'v' : '-');
-  }
-  putchar('\n');
-  printf("[VM] %8s[%4d]: ", "cfuncs", (int) sizeof(vm->cfuncs));
-  for (i = 0; i < ARRSIZE(vm->cfuncs); i++) {
-    putchar(vm->cfuncs[i].fn ? 'v' : '-');
   }
   putchar('\n');
   printf("[VM] %8s: %d/%d\n", "strings", vm->stringbuf_len,
@@ -450,7 +445,8 @@ static val_t mjs_concat(struct vm *vm, val_t v1, val_t v2) {
   return v;
 }
 
-static val_t mk_cfunc(struct vm *vm) {
+#if 0
+static val_t mk_cfunc(struct vm *vm, ind_t i) {
   ind_t i;
   for (i = 0; i < ARRSIZE(vm->cfuncs); i++) {
     if (vm->cfuncs[i].fn != NULL) continue;
@@ -458,6 +454,7 @@ static val_t mk_cfunc(struct vm *vm) {
   }
   return vm_err(vm, "cfunc OOM");
 }
+#endif
 
 static val_t mk_obj(struct vm *vm) {
   ind_t i;
@@ -1886,8 +1883,16 @@ static ffi_word_t valtow(struct mjs *vm, val_t v) {
   return ret;
 }
 
+static struct cfunc *findcfunc(struct vm *vm, ind_t id) {
+  struct cfunc *p;
+  for (p = vm->cfuncs; p != NULL; p = p->next) {
+    if (p->id == id) return p;
+  }
+  return NULL;
+}
+
 static val_t call_c_function(struct parser *p, val_t f) {
-  struct cfunc *cf = &p->vm->cfuncs[VAL_PAYLOAD(f)];
+  struct cfunc *cf = findcfunc(p->vm, f);
   val_t res = MJS_UNDEFINED, v = MJS_UNDEFINED, *top = vm_top(p->vm);
   struct ffi_arg args[FFI_MAX_ARGS_CNT + 1];  // First arg - return value
   struct fficbparam cbp;                      // For C callbacks only
@@ -2327,21 +2332,18 @@ val_t mjs_eval(struct vm *vm, const char *buf, int len) {
   return v;
 }
 
-val_t mjs_mk_c_func(struct vm *vm, cfn_t fn, const char *decl) {
-  val_t v = mk_cfunc(vm);
-  struct cfunc *cfunc = &vm->cfuncs[VAL_PAYLOAD(v)];
-  if (v == MJS_ERROR) return v;
-  if (decl == NULL || decl[0] == '\0') return vm_err(vm, "wrong type spec");
-  cfunc->fn = fn;
-  cfunc->decl = decl;
-  return v;
+static void addcfn(struct vm *vm, val_t obj, struct cfunc *cf) {
+  cf->next = vm->cfuncs;  // Link to the list
+  vm->cfuncs = cf;        // of all ffi-ed functions
+  cf->id = vm->cfunc_count++;  // Assign a unique ID
+  val_t val = MK_VAL(MJS_TYPE_C_FUNCTION, cf->id);  // Create JS value
+  mjs_set(vm, obj, mjs_mk_str(vm, cf->name, -1), val);  // Add to the object
 }
 
-val_t mjs_ffi(struct vm *vm, const char *p, cfn_t f, const char *s) {
-  val_t obj = mjs_get_global(vm);
-  val_t val = mjs_mk_c_func(vm, f, s);
-  if (mjs_type(val) == MJS_TYPE_ERROR) return val;
-  return mjs_set(mjs, obj, mjs_mk_str(vm, p, -1), val);
-}
+#define mjs_ffi(vm, fn, decl)                                 \
+  do {                                                        \
+    static struct cfunc x = {#fn, decl, (cfn_t) fn, 0, NULL}; \
+    addcfn((vm), mjs_get_global(vm), &x);                     \
+  } while (0)
 
 #endif  // MJS_H

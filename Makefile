@@ -1,7 +1,7 @@
 PROG = mjs
 DBG ?=
 #MFLAGS += -DMJS_DEBUG
-TFLAGS += -DMJS_CFUNC_POOL_SIZE=40 -DMJS_STRING_POOL_SIZE=512
+TFLAGS += -DMJS_STRING_POOL_SIZE=512
 CFLAGS += -W -Wall -Werror -Wstrict-overflow -fno-strict-aliasing -Os -g
 GCOV ?= true
 

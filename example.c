@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   struct mjs *mjs = mjs_create();
   val_t res = MJS_UNDEFINED;
 
-  mjs_ffi(mjs, "str", (cfn_t) tostr, "smj");
+  mjs_ffi(mjs, tostr, "smj");
 
   for (i = 1; i < argc && argv[i][0] == '-' && res != MJS_ERROR; i++) {
     if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
