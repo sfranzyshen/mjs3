@@ -1,9 +1,11 @@
-# mJS - a JS engine for embedded systems
+# Elk - a restricted JS engine for embedded systems
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
-[![Build Status](https://travis-ci.org/cpq/mjs3.svg?branch=master)](https://travis-ci.org/cpq/mjs3)
+[![Build Status](https://travis-ci.org/cpq/elk.svg?branch=master)](https://travis-ci.org/cpq/elk)
+[![Code Coverage](https://codecov.io/gh/cpq/elk/branch/master/graph/badge.svg)](https://codecov.io/gh/cpq/elk)
 
-mJS is a single-source JavaScript engine for microcontrollers.
+
+Elk is a single-file JavaScript engine for microcontrollers.
 
 ## Features
 
@@ -27,17 +29,16 @@ mJS is a single-source JavaScript engine for microcontrollers.
 
 ```c++
 #define MJS_STRING_POOL_SIZE 200    // Buffer for all strings
-#include "mjs.c"                    // Sketch -> Add File -> mjs.c
+#include "elk.c"                    // Sketch -> Add File -> elk.c
 
 extern "C" void myDelay(int x) { delay(x); }
 extern "C" void myDigitalWrite(int x, int y) { digitalWrite(x, y); }
 
 void setup() {
-  pinMode(13, OUTPUT);
-  struct mjs *vm = mjs_create();                        // Create JS instance
-  mjs_ffi(vm, "delay", (cfn_t) myDelay, "vi");          // Import delay()
-  mjs_ffi(vm, "write", (cfn_t) myDigitalWrite, "vii");  // Import write()
-  mjs_eval(vm, "while (1) { write(13, 0); delay(100); write(13, 1); delay(100); }", -1);
+  struct vm *vm = js_create();                        // Create JS instance
+  js_ffi(vm, "delay", (cfn_t) myDelay, "vi");        	// Import delay()
+  js_ffi(vm, "write", (cfn_t) myDigitalWrite, "vii"); // Import write()
+  js_eval(vm, "while (1) { write(13, 0); delay(100); write(13, 1); delay(100); }", -1);
 }
 
 void loop() { delay(1000); }
@@ -60,13 +61,13 @@ Global variables use 955 bytes (46%) of dynamic memory, leaving 1093 bytes for l
 | Simple types      | `let a = null, b = undefined, c = false, d = true;` |
 | Functions         | `let f = function(x, y) { return x + y; }; ` |
 | Objects           | `let obj = {a: 1, f: function(x) { return x * 2}}; obj.f();` |
-| Arrays            | `let arr = [1, 2, 'hi there']` |
 
 
 ## Unsupported standard operations and constructs
 
 | Name              |  Operation                                |
 | ----------------- | ----------------------------------------- |
+| Arrays            | `let arr = [1, 2, 'hi there']` |
 | Loops/switch      | `for (...) { ... }`,`for (let k in obj) { ... }`, `do { ... } while (...)`, `switch (...) {...}` |
 | Equality          | `==`, `!=`  (note: use strict equality `===`, `!==`) |
 | var               | `var ...`  (note: use `let ...`) |
