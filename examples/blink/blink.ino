@@ -1,5 +1,4 @@
-#define MJS_STRING_POOL_SIZE 200      // Buffer for all strings
-#include <mjs3.c>                    
+#include <mjs3.h>                    
 
 extern void myDelay(int x) { 
   delay(x);
